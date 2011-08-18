@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">Web IME Mushroom</string>
+   <string name="app_name">Web IME Mushroom</string>
+   <string name="list_empty">No data</string>
 </resources>
