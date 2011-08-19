@@ -1,7 +1,6 @@
 package jp.ponko2.android.webime
 
 import _root_.android.database.sqlite.{SQLiteOpenHelper, SQLiteDatabase}
-import _root_.android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
 import _root_.android.content.{Context, ContentValues}
 import _root_.android.provider.BaseColumns
 

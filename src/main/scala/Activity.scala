@@ -1,6 +1,6 @@
 package jp.ponko2.android.webime
 
-import _root_.android.app.{ListActivity, Dialog, AlertDialog}
+import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog}
 import _root_.android.os.{Bundle, AsyncTask}
 import _root_.android.content.{Context, ContentValues, Intent, DialogInterface}
 import _root_.android.database.Cursor
@@ -8,7 +8,6 @@ import _root_.android.database.sqlite.SQLiteDatabase
 import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
 import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, EditText}
 import _root_.android.text.ClipboardManager
-import _root_.android.content.Context.CLIPBOARD_SERVICE
 
 import dispatch.Http
 import dispatch.Threads
@@ -29,8 +28,17 @@ class MushroomActivity extends ListActivity {
     mDatabase = new WordDatabase(this).getWritableDatabase
 
     setupProgress()
+    setupReplaceKey()
     setContentView(R.layout.main)
     setupViews()
+  }
+
+  private def setupReplaceKey() {
+    val intent = getIntent()
+    val action = intent.getAction()
+    if (action != null && ACTION_INTERCEPT == action) {
+      mWord = intent.getStringExtra(REPLACE_KEY)
+    }
   }
 
   private def setupViews() {
@@ -98,10 +106,16 @@ class MushroomActivity extends ListActivity {
   }
 
   override protected def onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
-    super.onListItemClick(listView, view, position, id);
+    super.onListItemClick(listView, view, position, id)
     val description = view.getTag.asInstanceOf[WordDescription]
+    val result      = view.asInstanceOf[TextView].getText.toString
 
     onAddHistory(description.id)
+
+    val intent = new Intent()
+    intent.putExtra(REPLACE_KEY, result)
+    setResult(Activity.RESULT_OK, intent)
+    finish()
   }
 
   override protected def onCreateDialog(id: Int): Dialog = {
@@ -130,7 +144,7 @@ class MushroomActivity extends ListActivity {
   }
 
   private def onCopyWord(word: String) {
-    val cm = getSystemService(CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+    val cm = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
     cm.setText(word)
   }
 
@@ -245,9 +259,11 @@ class MushroomActivity extends ListActivity {
 }
 
 object MushroomActivity {
-  private final val MENU_ID_COPY   = 1
-  private final val MENU_ID_DELETE = 2
-  private final val INPUT_DIALOG   = 42
+  private final val ACTION_INTERCEPT = "com.adamrocker.android.simeji.ACTION_INTERCEPT"
+  private final val REPLACE_KEY      = "replace_key"
+  private final val MENU_ID_COPY     = 1
+  private final val MENU_ID_DELETE   = 2
+  private final val INPUT_DIALOG     = 42
 
   private class WordDescription {
     var id: String = _
