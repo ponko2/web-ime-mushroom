@@ -1,12 +1,12 @@
 package jp.ponko2.android.webime
 
-import _root_.android.app.ListActivity
+import _root_.android.app.{ListActivity, Dialog, AlertDialog}
 import _root_.android.os.{Bundle, AsyncTask}
-import _root_.android.content.{Context, ContentValues, Intent}
+import _root_.android.content.{Context, ContentValues, Intent, DialogInterface}
 import _root_.android.database.Cursor
 import _root_.android.database.sqlite.SQLiteDatabase
 import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
-import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView}
+import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, EditText}
 import _root_.android.text.ClipboardManager
 import _root_.android.content.Context.CLIPBOARD_SERVICE
 
@@ -16,6 +16,7 @@ import dispatch.Threads
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
+  private var mWord:     String         = _
   private var mDatabase: SQLiteDatabase = _
   private var mAdapter:  WordsAdapter   = _
   private var mTask:     AsyncTask[String, Nothing, Int] = _
@@ -25,23 +26,22 @@ class MushroomActivity extends ListActivity {
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
-    val word = "きたー"
-
     mDatabase = new WordDatabase(this).getWritableDatabase
 
     setupProgress()
-    setupViews(word)
-
-    onTransliterate(word)
+    setContentView(R.layout.main)
+    setupViews()
   }
 
-  private def setupViews(word: String) {
-    setContentView(R.layout.main)
-
-    mAdapter  = new WordsAdapter(this, initializeCursor(word))
-    setListAdapter(mAdapter)
-
-    registerForContextMenu(getListView())
+  private def setupViews() {
+    if (mWord != null && mWord.nonEmpty) {
+      mAdapter = new WordsAdapter(this, initializeCursor())
+      setListAdapter(mAdapter)
+      registerForContextMenu(getListView())
+      onTransliterate()
+    } else {
+      showDialog(INPUT_DIALOG)
+    }
   }
 
   override def onCreateOptionsMenu(menu: Menu): Boolean = {
@@ -97,7 +97,6 @@ class MushroomActivity extends ListActivity {
     mHttp.shutdown()
   }
 
-
   override protected def onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
     super.onListItemClick(listView, view, position, id);
     val description = view.getTag.asInstanceOf[WordDescription]
@@ -105,9 +104,29 @@ class MushroomActivity extends ListActivity {
     onAddHistory(description.id)
   }
 
+  override protected def onCreateDialog(id: Int): Dialog = {
+    id match {
+      case INPUT_DIALOG => {
+        val inflater = LayoutInflater.from(this)
+        val view     = inflater.inflate(R.layout.input_dialog, null)
+        new AlertDialog.Builder(MushroomActivity.this)
+           .setIcon(android.R.drawable.ic_dialog_info)
+           .setTitle(R.string.input_dialog_title)
+           .setView(view)
+           .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+              def onClick(dialog: DialogInterface, which: Int) {
+                mWord = view.findViewById(R.id.input_text).asInstanceOf[EditText].getText.toString
+                setupViews()
+              }
+           })
+           .create()
+      }
+      case _ => null
+    }
+  }
 
-  private def onTransliterate(word: String) {
-    if (word.nonEmpty) mTask = new TransliterateTask().execute(word)
+  private def onTransliterate() {
+    mTask = new TransliterateTask().execute(mWord)
   }
 
   private def onCopyWord(word: String) {
@@ -141,11 +160,11 @@ class MushroomActivity extends ListActivity {
   private def showProgress() = setProgressBarIndeterminateVisibility(true)
   private def hideProgress() = setProgressBarIndeterminateVisibility(false)
 
-  private def initializeCursor(word: String): Cursor = {
+  private def initializeCursor(): Cursor = {
     val cursor = mDatabase.query(
       WordDatabase.TABLE_WORDS,
       Array(WordDatabase._ID, WordDatabase.COLUMN_API, WordDatabase.COLUMN_RESULT, WordDatabase.COLUMN_SEPARATOR),
-      WordDatabase.COLUMN_INPUT + "=?", Array(word), null, null, WordDatabase.SORT_DEFAULT)
+      WordDatabase.COLUMN_INPUT + "=?", Array(mWord), null, null, WordDatabase.SORT_DEFAULT)
 
     startManagingCursor(cursor)
 
@@ -228,6 +247,7 @@ class MushroomActivity extends ListActivity {
 object MushroomActivity {
   private final val MENU_ID_COPY   = 1
   private final val MENU_ID_DELETE = 2
+  private final val INPUT_DIALOG   = 42
 
   private class WordDescription {
     var id: String = _
