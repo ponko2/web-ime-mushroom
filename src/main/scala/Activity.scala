@@ -6,7 +6,7 @@ import _root_.android.content.{Context, ContentValues, Intent}
 import _root_.android.database.Cursor
 import _root_.android.database.sqlite.SQLiteDatabase
 import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
-import _root_.android.widget.{AdapterView, CursorAdapter, TextView}
+import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView}
 import _root_.android.text.ClipboardManager
 import _root_.android.content.Context.CLIPBOARD_SERVICE
 
@@ -97,6 +97,15 @@ class MushroomActivity extends ListActivity {
     mHttp.shutdown()
   }
 
+
+  override protected def onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
+    super.onListItemClick(listView, view, position, id);
+    val description = view.getTag.asInstanceOf[WordDescription]
+
+    onAddHistory(description.id)
+  }
+
+
   private def onTransliterate(word: String) {
     if (word.nonEmpty) mTask = new TransliterateTask().execute(word)
   }
@@ -104,6 +113,14 @@ class MushroomActivity extends ListActivity {
   private def onCopyWord(word: String) {
     val cm = getSystemService(CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
     cm.setText(word)
+  }
+
+  private def onAddHistory(id: String) {
+    val values = new ContentValues()
+    values.put(WordDatabase.COLUMN_HISTORY, 0.0)
+
+    mDatabase.update(WordDatabase.TABLE_WORDS, values,
+                     WordDatabase._ID + "=?", Array(id))
   }
 
   private def onRemoveWord(id: String) {
