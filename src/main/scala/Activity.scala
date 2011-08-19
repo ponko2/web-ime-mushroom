@@ -6,7 +6,7 @@ import _root_.android.content.{Context, ContentValues, Intent, DialogInterface}
 import _root_.android.database.Cursor
 import _root_.android.database.sqlite.SQLiteDatabase
 import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
-import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, EditText}
+import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, EditText, Toast}
 import _root_.android.text.ClipboardManager
 
 import dispatch.Http
@@ -15,10 +15,11 @@ import dispatch.Threads
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
-  private var mWord:     String         = _
-  private var mDatabase: SQLiteDatabase = _
-  private var mAdapter:  WordsAdapter   = _
-  private var mTask:     AsyncTask[String, Nothing, Int] = _
+  private var mWord:       String         = _
+  private var mReplaceKey: Boolean        = _
+  private var mDatabase:   SQLiteDatabase = _
+  private var mAdapter:    WordsAdapter   = _
+  private var mTask:       AsyncTask[String, Nothing, Int] = _
   private val mHttp   = new Http with Threads
   private val mWebIME = Seq(GoogleSuggest, GoogleJapaneseInput, SocialIME)
 
@@ -38,6 +39,9 @@ class MushroomActivity extends ListActivity {
     val action = intent.getAction()
     if (action != null && ACTION_INTERCEPT == action) {
       mWord = intent.getStringExtra(REPLACE_KEY)
+      mReplaceKey = true
+    } else {
+      mReplaceKey = false
     }
   }
 
@@ -113,7 +117,11 @@ class MushroomActivity extends ListActivity {
     onAddHistory(description.id)
 
     val intent = new Intent()
-    intent.putExtra(REPLACE_KEY, result)
+    if (mReplaceKey) {
+      intent.putExtra(REPLACE_KEY, result)
+    } else {
+      onCopyWord(result)
+    }
     setResult(Activity.RESULT_OK, intent)
     finish()
   }
@@ -144,8 +152,9 @@ class MushroomActivity extends ListActivity {
   }
 
   private def onCopyWord(word: String) {
-    val cm = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-    cm.setText(word)
+    val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+    clipboardManager.setText(word)
+    Toast.makeText(this, R.string.toast_copy_word, Toast.LENGTH_LONG).show()
   }
 
   private def onAddHistory(id: String) {
