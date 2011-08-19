@@ -1,4 +1,7 @@
 <resources>
    <string name="app_name">Web IME Mushroom</string>
    <string name="list_empty">No data</string>
+   <string name="context_menu_copy_word">Copy</string>
+   <string name="context_menu_delete_word">Delete</string>
+   <string name="menu_item_delete_label">Delete Cache</string>
 </resources>

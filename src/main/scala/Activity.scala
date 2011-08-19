@@ -5,8 +5,10 @@ import _root_.android.os.{Bundle, AsyncTask}
 import _root_.android.content.{Context, ContentValues, Intent}
 import _root_.android.database.Cursor
 import _root_.android.database.sqlite.SQLiteDatabase
-import _root_.android.view.{Window, View, ViewGroup, LayoutInflater}
-import _root_.android.widget.{CursorAdapter, TextView}
+import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
+import _root_.android.widget.{AdapterView, CursorAdapter, TextView}
+import _root_.android.text.ClipboardManager
+import _root_.android.content.Context.CLIPBOARD_SERVICE
 
 import dispatch.Http
 import dispatch.Threads
@@ -23,16 +25,65 @@ class MushroomActivity extends ListActivity {
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
-    val word = "しょぼーん"
+    val word = "きたー"
 
     mDatabase = new WordDatabase(this).getWritableDatabase
-    mAdapter  = new WordsAdapter(this, initializeCursor(word))
 
     setupProgress()
+    setupViews(word)
+
+    onTransliterate(word)
+  }
+
+  private def setupViews(word: String) {
     setContentView(R.layout.main)
+
+    mAdapter  = new WordsAdapter(this, initializeCursor(word))
     setListAdapter(mAdapter)
 
-    mTask = new TransliterateTask().execute(word)
+    registerForContextMenu(getListView())
+  }
+
+  override def onCreateOptionsMenu(menu: Menu): Boolean = {
+    getMenuInflater.inflate(R.menu.main, menu)
+    super.onCreateOptionsMenu(menu)
+  }
+
+  override def onMenuItemSelected(featureId: Int, item: MenuItem): Boolean = {
+    item.getItemId match {
+      case R.id.menu_item_delete =>
+        onRemoveAllWord()
+        true
+      case _ =>
+        super.onMenuItemSelected(featureId, item)
+    }
+  }
+
+  override def onCreateContextMenu(menu: ContextMenu, view: View, menuInfo: ContextMenu.ContextMenuInfo) {
+    super.onCreateContextMenu(menu, view, menuInfo)
+
+    val info = menuInfo.asInstanceOf[AdapterView.AdapterContextMenuInfo]
+    menu.setHeaderTitle(info.targetView.asInstanceOf[TextView].getText)
+
+    menu.add(0, MENU_ID_COPY,   0, R.string.context_menu_copy_word)
+    menu.add(0, MENU_ID_DELETE, 0, R.string.context_menu_delete_word)
+  }
+
+  override def onContextItemSelected(item: MenuItem): Boolean = {
+    val info = item.getMenuInfo.asInstanceOf[AdapterView.AdapterContextMenuInfo]
+    val description = info.targetView.getTag.asInstanceOf[WordDescription]
+
+    item.getItemId match {
+      case MENU_ID_COPY =>
+        val word = info.targetView.asInstanceOf[TextView].getText.toString
+        onCopyWord(word)
+        true
+      case MENU_ID_DELETE =>
+        onRemoveWord(description.id)
+        true
+      case _ =>
+        super.onContextItemSelected(item)
+    }
   }
 
   override protected def onDestroy() {
@@ -43,6 +94,26 @@ class MushroomActivity extends ListActivity {
     }
 
     mDatabase.close()
+    mHttp.shutdown()
+  }
+
+  private def onTransliterate(word: String) {
+    if (word.nonEmpty) mTask = new TransliterateTask().execute(word)
+  }
+
+  private def onCopyWord(word: String) {
+    val cm = getSystemService(CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+    cm.setText(word)
+  }
+
+  private def onRemoveWord(id: String) {
+    val rows = mDatabase.delete(WordDatabase.TABLE_WORDS, WordDatabase._ID + "=?", Array(id))
+    if (rows > 0) mAdapter.refresh()
+  }
+
+  private def onRemoveAllWord() {
+    val rows = mDatabase.delete(WordDatabase.TABLE_WORDS, null, null)
+    if (rows > 0) mAdapter.refresh()
   }
 
   private def setupProgress() {
@@ -57,7 +128,7 @@ class MushroomActivity extends ListActivity {
     val cursor = mDatabase.query(
       WordDatabase.TABLE_WORDS,
       Array(WordDatabase._ID, WordDatabase.COLUMN_API, WordDatabase.COLUMN_RESULT, WordDatabase.COLUMN_SEPARATOR),
-      "input = ?", Array(word), null, null, WordDatabase.SORT_DEFAULT)
+      WordDatabase.COLUMN_INPUT + "=?", Array(word), null, null, WordDatabase.SORT_DEFAULT)
 
     startManagingCursor(cursor)
 
@@ -138,6 +209,9 @@ class MushroomActivity extends ListActivity {
 }
 
 object MushroomActivity {
+  private final val MENU_ID_COPY   = 1
+  private final val MENU_ID_DELETE = 2
+
   private class WordDescription {
     var id: String = _
   }
