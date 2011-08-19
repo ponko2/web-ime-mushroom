@@ -1,44 +1,87 @@
 package jp.ponko2.android.webime
 
 import _root_.android.app.ListActivity
-import _root_.android.os.Bundle
+import _root_.android.os.{Bundle, AsyncTask}
 import _root_.android.content.{Context, ContentValues, Intent}
 import _root_.android.database.Cursor
 import _root_.android.database.sqlite.SQLiteDatabase
-import _root_.android.view.{View, ViewGroup, LayoutInflater}
+import _root_.android.view.{Window, View, ViewGroup, LayoutInflater}
 import _root_.android.widget.{CursorAdapter, TextView}
+
+import dispatch.Http
+import dispatch.Threads
 
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
   private var mDatabase: SQLiteDatabase = _
   private var mAdapter:  WordsAdapter   = _
+  private var mTask:     AsyncTask[String, Nothing, Int] = _
+  private val mHttp   = new Http with Threads
+  private val mWebIME = Seq(GoogleSuggest, GoogleJapaneseInput, SocialIME)
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
-    mDatabase = new WordDatabase(this).getWritableDatabase
-    mAdapter  = new WordsAdapter(this, initializeCursor())
+    val word = "しょぼーん"
 
+    mDatabase = new WordDatabase(this).getWritableDatabase
+    mAdapter  = new WordsAdapter(this, initializeCursor(word))
+
+    setupProgress()
     setContentView(R.layout.main)
     setListAdapter(mAdapter)
+
+    mTask = new TransliterateTask().execute(word)
   }
 
   override protected def onDestroy() {
     super.onDestroy()
 
+    if (mTask != null && mTask.getStatus == AsyncTask.Status.RUNNING) {
+      mTask cancel true
+    }
+
     mDatabase.close()
   }
 
-  private def initializeCursor(): Cursor = {
+  private def setupProgress() {
+    requestWindowFeature(Window.FEATURE_PROGRESS)
+    requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS)
+  }
+
+  private def showProgress() = setProgressBarIndeterminateVisibility(true)
+  private def hideProgress() = setProgressBarIndeterminateVisibility(false)
+
+  private def initializeCursor(word: String): Cursor = {
     val cursor = mDatabase.query(
       WordDatabase.TABLE_WORDS,
       Array(WordDatabase._ID, WordDatabase.COLUMN_API, WordDatabase.COLUMN_RESULT, WordDatabase.COLUMN_SEPARATOR),
-      null, null, null, null, WordDatabase.SORT_DEFAULT)
+      "input = ?", Array(word), null, null, WordDatabase.SORT_DEFAULT)
 
     startManagingCursor(cursor)
 
     cursor
+  }
+
+  private class TransliterateTask extends AsyncTask1[String, Nothing, Int] {
+    override def onPreExecute() = showProgress()
+
+    def doInBackground(param: String): Int = {
+      mWebIME./:(0) {
+        (sum, webime) => {
+          val words = mHttp(webime.transliterate(param))
+          sum + WordDatabase.addWords(mDatabase, webime.tag, param, words)
+        }
+      }
+    }
+
+    override def onPostExecute(result: Int) {
+      hideProgress()
+      if (result > 0) {
+        mAdapter.refresh()
+      }
+    }
   }
 
   private class WordsAdapter(context: Context, cursor: Cursor) extends CursorAdapter(context, cursor, true) {
