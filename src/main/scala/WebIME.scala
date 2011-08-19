@@ -4,6 +4,9 @@ import scala.xml._
 import dispatch._
 import dispatch.liftjson.Js._
 import net.liftweb.json.JsonAST._
+import org.xml.sax.InputSource
+import java.io.StringReader
+import javax.xml.parsers.SAXParserFactory
 
 abstract class WebIME {
   val tag:String
@@ -45,10 +48,18 @@ object GoogleSuggest extends WebIME {
     require(text.nonEmpty)
 
     api <<? Map("hl" -> "ja", "output" -> "toolbar", "q" -> text) >- {
-      xml => for {
-        suggestion <- XML.loadString(xml) \\ "suggestion"
-        data <- suggestion \ "@data" map(attribute => attribute.text)
-      } yield data
+      xml => {
+        // Android2.1 対応
+        val factory = SAXParserFactory.newInstance()
+        factory.setFeature("http://xml.org/sax/features/namespaces", false)
+        factory.setFeature("http://xml.org/sax/features/namespace-prefixes", true)
+        val parser = factory.newSAXParser()
+
+        for {
+          suggestion <- XML.loadXML(new InputSource(new StringReader(xml)), parser) \\ "suggestion"
+          data <- suggestion \ "@data" map(attribute => attribute.text)
+        } yield data
+      }
     }
   }
 }
