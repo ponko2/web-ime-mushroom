@@ -20,7 +20,7 @@ class MushroomActivity extends ListActivity {
   private var mDatabase:   SQLiteDatabase = _
   private var mAdapter:    WordsAdapter   = _
   private var mTasks:      Seq[AsyncTask[String, Nothing, Int]] = _
-  private val mHttp   = new Http with Threads
+  private val mHttp = new Http with Threads
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
@@ -106,7 +106,8 @@ class MushroomActivity extends ListActivity {
       }
     }
 
-    mTasks.foreach(cancel)
+    if (mTasks != null) mTasks.foreach(cancel)
+
     mDatabase.close()
     mHttp.shutdown()
   }
@@ -176,7 +177,10 @@ class MushroomActivity extends ListActivity {
 
   private def onRemoveAllWord() {
     val rows = mDatabase.delete(WordDatabase.TABLE_WORDS, null, null)
-    if (rows > 0) mAdapter.refresh()
+    if (rows > 0) {
+      Toast.makeText(this, R.string.toast_remove_cache, Toast.LENGTH_LONG).show()
+      if (mAdapter != null) mAdapter.refresh()
+    }
   }
 
   private def setupProgress() {
