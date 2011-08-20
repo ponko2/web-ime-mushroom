@@ -21,8 +21,8 @@ object SocialIME extends WebIME {
   def transliterate(text:String) = {
     require(text.nonEmpty)
 
-    api <<? Map("charset" -> "UTF-8", "string" -> text) >- {
-      tsv => tsv.stripLineEnd.split("\t+")
+    api <<? Map("charset" -> "UTF-8", "string" -> text, "resize[0]" -> "+99999") >- {
+      tsv => tsv.stripLineEnd.split("[\t\n\r]+")
     }
   }
 }
