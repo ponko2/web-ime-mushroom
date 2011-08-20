@@ -1,0 +1,20 @@
+# Web IME Mushroom
+## 説明
+Simeji/ATOK等のマッシュルーム対応アプリから呼び出し、Social IME/Google日本語入力/Google Suggestで変換を行うプラグインです。
+
+## アプリのスクリーンショット
+[サンプル画像1](https://github.com/downloads/ponko2/web-ime-mushroom/sample1.png)
+[サンプル画像2](https://github.com/downloads/ponko2/web-ime-mushroom/sample2.png)
+
+## 機能
+* 一度変換した文字のキャッシュ
+* 変換に使用した文字の最前列表示
+* Item長押しからのClipboardへのコピー
+* マッシュルーム以外からの起動(Clipboardへコピーされます)
+
+## インストール
+Downloadsからapkファイルをダウンロードし、Android端末にファイルを移動した後にインストールしてください。  
+※Android端末にて直接ダウンロードするとインストールに失敗することがあるようです
+
+## アイコン
+いつか作る
