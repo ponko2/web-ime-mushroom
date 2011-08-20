@@ -13,7 +13,7 @@ class WordDatabase(mContext: Context)
                   |   _id       INTEGER PRIMARY KEY,
                   |   api       TEXT NOT NULL,
                   |   input     TEXT NOT NULL,
-                  |   result    TEXT NOT NULL DEFAULT "-",
+                  |   result    TEXT NOT NULL,
                   |   separator INTEGER DEFAULT 1 CHECK(separator in (0,1)),
                   |   history   INTEGER DEFAULT 1 CHECK(history   in (0,1)),
                   |   UNIQUE(api, input, result, separator));""".stripMargin)
@@ -44,6 +44,7 @@ object WordDatabase {
     val values = new ContentValues()
     values.put(COLUMN_API, api)
     values.put(COLUMN_INPUT, input)
+    values.put(COLUMN_RESULT, input)
     values.put(COLUMN_SEPARATOR, 0.0)
 
     db.insert(TABLE_WORDS, null, values)

@@ -22,7 +22,7 @@ object SocialIME extends WebIME {
     require(text.nonEmpty)
 
     api <<? Map("charset" -> "UTF-8", "string" -> text) >- {
-      tsv => tsv.stripLineEnd.split("\t")
+      tsv => tsv.stripLineEnd.split("\t+")
     }
   }
 }
