@@ -19,9 +19,8 @@ class MushroomActivity extends ListActivity {
   private var mReplaceKey: Boolean        = _
   private var mDatabase:   SQLiteDatabase = _
   private var mAdapter:    WordsAdapter   = _
-  private var mTask:       AsyncTask[String, Nothing, Int] = _
+  private var mTasks:      Seq[AsyncTask[String, Nothing, Int]] = _
   private val mHttp   = new Http with Threads
-  private val mWebIME = Seq(GoogleSuggest, GoogleJapaneseInput, SocialIME)
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
@@ -101,10 +100,13 @@ class MushroomActivity extends ListActivity {
   override protected def onDestroy() {
     super.onDestroy()
 
-    if (mTask != null && mTask.getStatus == AsyncTask.Status.RUNNING) {
-      mTask cancel true
+    def cancel(task: AsyncTask[_, _, _]) {
+      if (task != null && task.getStatus == AsyncTask.Status.RUNNING) {
+        task cancel true
+      }
     }
 
+    mTasks.foreach(cancel)
     mDatabase.close()
     mHttp.shutdown()
   }
@@ -148,7 +150,9 @@ class MushroomActivity extends ListActivity {
   }
 
   private def onTransliterate() {
-    mTask = new TransliterateTask().execute(mWord)
+    mTasks = Seq(new TransliterateTask(GoogleJapaneseInput).execute(mWord),
+                 new TransliterateTask(GoogleSuggest).execute(mWord),
+                 new TransliterateTask(SocialIME).execute(mWord))
   }
 
   private def onCopyWord(word: String) {
@@ -181,7 +185,11 @@ class MushroomActivity extends ListActivity {
   }
 
   private def showProgress() = setProgressBarIndeterminateVisibility(true)
-  private def hideProgress() = setProgressBarIndeterminateVisibility(false)
+
+  private def hideProgress() = {
+    if (mTasks.count(task => task != null && task.getStatus == AsyncTask.Status.RUNNING) <= 1)
+      setProgressBarIndeterminateVisibility(false)
+  }
 
   private def initializeCursor(): Cursor = {
     val cursor = mDatabase.query(
@@ -190,27 +198,20 @@ class MushroomActivity extends ListActivity {
       WordDatabase.COLUMN_INPUT + "=?", Array(mWord), null, null, WordDatabase.SORT_DEFAULT)
 
     startManagingCursor(cursor)
-
     cursor
   }
 
-  private class TransliterateTask extends AsyncTask1[String, Nothing, Int] {
+  private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Nothing, Int] {
     override def onPreExecute() = showProgress()
 
     def doInBackground(param: String): Int = {
-      mWebIME./:(0) {
-        (sum, webime) => {
-          val words = mHttp(webime.transliterate(param))
-          sum + WordDatabase.addWords(mDatabase, webime.tag, param, words)
-        }
-      }
+      val words = mHttp(webIME.transliterate(param))
+      WordDatabase.addWords(mDatabase, webIME.tag, param, words)
     }
 
     override def onPostExecute(result: Int) {
       hideProgress()
-      if (result > 0) {
-        mAdapter.refresh()
-      }
+      if (result > 0) mAdapter.refresh()
     }
   }
 
