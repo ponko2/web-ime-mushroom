@@ -60,7 +60,7 @@ object WordDatabase {
   }
 
   def addWords(db: SQLiteDatabase, api: String, input: String, words: Seq[String]): Int = {
-    addSeparator(db, api, input)
+    if (words.nonEmpty) addSeparator(db, api, input)
     words.map(word => addWord(db, api, input, word)).count(result => result != -1L)
   }
 }
