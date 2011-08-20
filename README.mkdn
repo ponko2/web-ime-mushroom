@@ -13,5 +13,4 @@ Simeji/ATOK等のマッシュルーム対応アプリから呼び出し、Social
 * マッシュルーム以外からの起動(Clipboardへコピーされます)
 
 ## インストール
-Downloadsからapkファイルをダウンロードし、Android端末にファイルを移動した後にインストールしてください。  
-※Android端末にて直接ダウンロードするとインストールに失敗することがあるようです
+[Android Market](https://market.android.com/details?id=jp.ponko2.android.webime)
