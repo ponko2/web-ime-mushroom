@@ -1,8 +1,8 @@
 <manifest
    xmlns:android="http://schemas.android.com/apk/res/android"
    package="jp.ponko2.android.webime"
-   android:versionName="0.2.1"
-   android:versionCode="2">
+   android:versionName="0.2.2"
+   android:versionCode="3">
    <uses-sdk android:minSdkVersion="7"/>
    <uses-permission android:name="android.permission.INTERNET"/>
    <application
