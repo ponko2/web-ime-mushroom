@@ -9,8 +9,11 @@ import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup
 import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, EditText, Toast}
 import _root_.android.text.ClipboardManager
 
+import scala.util.control.Exception._
+
 import dispatch.Http
 import dispatch.Threads
+import dispatch.StatusCode
 
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
@@ -19,7 +22,7 @@ class MushroomActivity extends ListActivity {
   private var mReplaceKey: Boolean        = _
   private var mDatabase:   SQLiteDatabase = _
   private var mAdapter:    WordsAdapter   = _
-  private var mTasks:      Seq[AsyncTask[String, Nothing, Int]] = _
+  private var mTasks:      Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = _
   private val mHttp = new Http with Threads
 
   override def onCreate(savedInstanceState: Bundle) {
@@ -205,17 +208,25 @@ class MushroomActivity extends ListActivity {
     cursor
   }
 
-  private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Nothing, Int] {
+  private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Nothing, Either[Throwable, Int]] {
     override def onPreExecute() = showProgress()
 
-    def doInBackground(param: String): Int = {
-      val words = mHttp(webIME.transliterate(param))
-      WordDatabase.addWords(mDatabase, webIME.tag, param, words)
+    def doInBackground(param: String): Either[Throwable, Int] = {
+      allCatch either WordDatabase.addWords(mDatabase, webIME.tag, param, mHttp(webIME.transliterate(param)))
     }
 
-    override def onPostExecute(result: Int) {
+    override def onPostExecute(result: Either[Throwable, Int]) {
       hideProgress()
-      if (result > 0) mAdapter.refresh()
+      result match {
+        case Right(count) => if (count > 0) mAdapter.refresh()
+        case Left(error) => {
+          val message = webIME.tag + " - " + (error match {
+            case StatusCode(code, _) => "Http Status: " + code
+            case other => other.toString
+          })
+          Toast.makeText(MushroomActivity.this, message, Toast.LENGTH_LONG).show()
+        }
+      }
     }
   }
 
