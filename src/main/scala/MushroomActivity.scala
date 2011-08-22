@@ -2,7 +2,7 @@ package jp.ponko2.android.webime
 
 import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog, SearchManager}
 import _root_.android.os.{Bundle, AsyncTask}
-import _root_.android.content.{Context, ContentValues, Intent, DialogInterface}
+import _root_.android.content.{Context, ContentValues, Intent, DialogInterface, SharedPreferences}
 import _root_.android.database.Cursor
 import _root_.android.database.sqlite.SQLiteDatabase
 import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
@@ -10,6 +10,7 @@ import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, Ed
 import _root_.android.text.ClipboardManager
 
 import scala.util.control.Exception._
+import scala.collection.mutable.ArrayBuffer
 
 import dispatch.Http
 import dispatch.Threads
@@ -18,22 +19,26 @@ import dispatch.StatusCode
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
-  private var mWord:       String           = _
-  private var mReplaceKey: Boolean          = _
-  private var mDatabase:   SQLiteDatabase   = _
-  private var mAdapter:    WordsAdapter     = _
-  private var mClipboard:  ClipboardManager = _
-  private var mTasks:      Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = _
+  private var mWord:        String            = _
+  private var mReplaceKey:  Boolean           = _
+  private var mDatabase:    SQLiteDatabase    = _
+  private var mAdapter:     WordsAdapter      = _
+  private var mClipboard:   ClipboardManager  = _
+  private var mPreferences: SharedPreferences = _
+  private var mAPI:         ArrayBuffer[WebIME] = ArrayBuffer()
+  private var mTasks:       ArrayBuffer[AsyncTask[String, Nothing, Either[Throwable, Int]]] = ArrayBuffer()
   private val mHttp = new Http with Threads
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
-    mDatabase  = new WordDatabase(this).getWritableDatabase
-    mClipboard = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+    mDatabase    = new WordDatabase(this).getWritableDatabase
+    mPreferences = getSharedPreferences(Preferences.NAME, Context.MODE_PRIVATE)
+    mClipboard   = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
 
     setupProgress()
     setupReplaceKey()
+    setupAPI()
     setContentView(R.layout.main)
     setupViews()
   }
@@ -46,6 +51,21 @@ class MushroomActivity extends ListActivity {
       mReplaceKey = true
     } else {
       mReplaceKey = false
+    }
+  }
+
+  private def setupAPI() {
+    if (mPreferences.getBoolean(Preferences.KEY_GOOGLE_JAPANESE_INPUT, true)) {
+      mAPI += GoogleJapaneseInput
+    }
+    if (mPreferences.getBoolean(Preferences.KEY_GOOGLE_SUGGEST, true)) {
+      mAPI += GoogleSuggest
+    }
+    if (mPreferences.getBoolean(Preferences.KEY_SOCIAL_IME, true)) {
+      mAPI += SocialIME
+    }
+    if (mPreferences.getBoolean(Preferences.KEY_SOCIAL_IME_PREDICT, true)) {
+      mAPI += SocialImePredict
     }
   }
 
@@ -67,6 +87,9 @@ class MushroomActivity extends ListActivity {
 
   override def onMenuItemSelected(featureId: Int, item: MenuItem): Boolean = {
     item.getItemId match {
+      case R.id.menu_item_settings =>
+        SettingsActivity.show(this)
+        true
       case R.id.menu_item_delete =>
         onRemoveAllWord()
         true
@@ -162,10 +185,7 @@ class MushroomActivity extends ListActivity {
   }
 
   private def onTransliterate() {
-    mTasks = Seq(new TransliterateTask(GoogleJapaneseInput).execute(mWord),
-                 new TransliterateTask(GoogleSuggest).execute(mWord),
-                 new TransliterateTask(SocialIME).execute(mWord),
-                 new TransliterateTask(SocialImePredict).execute(mWord))
+    mAPI.foreach(api => mTasks += new TransliterateTask(api).execute(mWord))
   }
 
   private def onCopyWord(word: String) {
@@ -213,10 +233,18 @@ class MushroomActivity extends ListActivity {
   }
 
   private def initializeCursor(): Cursor = {
+    val selection = if (mAPI.nonEmpty) {
+      WordDatabase.COLUMN_INPUT + "=? and " +
+        mAPI.map(api => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")")
+    } else { "0 = 1" }
+    val selectionArgs = if (mAPI.nonEmpty) {
+      mAPI./:(ArrayBuffer(mWord)) { (buffer, api) => buffer += api.tag }.toArray
+    } else { null }
+
     val cursor = mDatabase.query(
       WordDatabase.TABLE_WORDS,
       Array(WordDatabase._ID, WordDatabase.COLUMN_API, WordDatabase.COLUMN_RESULT, WordDatabase.COLUMN_SEPARATOR),
-      WordDatabase.COLUMN_INPUT + "=?", Array(mWord), null, null, WordDatabase.SORT_DEFAULT)
+      selection, selectionArgs, null, null, WordDatabase.SORT_DEFAULT)
 
     startManagingCursor(cursor)
     cursor
