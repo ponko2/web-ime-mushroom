@@ -1,6 +1,6 @@
 package jp.ponko2.android.webime
 
-import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog}
+import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog, SearchManager}
 import _root_.android.os.{Bundle, AsyncTask}
 import _root_.android.content.{Context, ContentValues, Intent, DialogInterface}
 import _root_.android.database.Cursor
@@ -83,19 +83,23 @@ class MushroomActivity extends ListActivity {
 
     menu.add(0, MENU_ID_COPY,   0, R.string.context_menu_copy_word)
     menu.add(0, MENU_ID_DELETE, 0, R.string.context_menu_delete_word)
+    menu.add(0, MENU_ID_SEARCH, 0, R.string.context_menu_search_word)
   }
 
   override def onContextItemSelected(item: MenuItem): Boolean = {
     val info = item.getMenuInfo.asInstanceOf[AdapterView.AdapterContextMenuInfo]
     val description = info.targetView.getTag.asInstanceOf[WordDescription]
+    val word = info.targetView.asInstanceOf[TextView].getText.toString
 
     item.getItemId match {
       case MENU_ID_COPY =>
-        val word = info.targetView.asInstanceOf[TextView].getText.toString
         onCopyWord(word)
         true
       case MENU_ID_DELETE =>
         onRemoveWord(description.id)
+        true
+      case MENU_ID_SEARCH =>
+        onSearchWord(word)
         true
       case _ =>
         super.onContextItemSelected(item)
@@ -180,6 +184,12 @@ class MushroomActivity extends ListActivity {
   private def onRemoveWord(id: String) {
     val rows = mDatabase.delete(WordDatabase.TABLE_WORDS, WordDatabase._ID + "=?", Array(id))
     if (rows > 0) mAdapter.refresh()
+  }
+
+  private def onSearchWord(word: String) {
+    val intent = new Intent(Intent.ACTION_WEB_SEARCH)
+    intent.putExtra(SearchManager.QUERY, word)
+    startActivity(intent)
   }
 
   private def onRemoveAllWord() {
@@ -292,6 +302,7 @@ object MushroomActivity {
   private final val REPLACE_KEY      = "replace_key"
   private final val MENU_ID_COPY     = 1
   private final val MENU_ID_DELETE   = 2
+  private final val MENU_ID_SEARCH   = 3
   private final val INPUT_DIALOG     = 42
 
   private class WordDescription {
