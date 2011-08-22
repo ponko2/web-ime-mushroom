@@ -18,17 +18,19 @@ import dispatch.StatusCode
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
-  private var mWord:       String         = _
-  private var mReplaceKey: Boolean        = _
-  private var mDatabase:   SQLiteDatabase = _
-  private var mAdapter:    WordsAdapter   = _
+  private var mWord:       String           = _
+  private var mReplaceKey: Boolean          = _
+  private var mDatabase:   SQLiteDatabase   = _
+  private var mAdapter:    WordsAdapter     = _
+  private var mClipboard:  ClipboardManager = _
   private var mTasks:      Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = _
   private val mHttp = new Http with Threads
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
-    mDatabase = new WordDatabase(this).getWritableDatabase
+    mDatabase  = new WordDatabase(this).getWritableDatabase
+    mClipboard = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
 
     setupProgress()
     setupReplaceKey()
@@ -137,13 +139,15 @@ class MushroomActivity extends ListActivity {
       case INPUT_DIALOG => {
         val inflater = LayoutInflater.from(this)
         val view     = inflater.inflate(R.layout.input_dialog, null)
+        val editText = view.findViewById(R.id.input_text).asInstanceOf[EditText]
+        editText.setText(mClipboard.getText)
         new AlertDialog.Builder(MushroomActivity.this)
            .setIcon(android.R.drawable.ic_dialog_info)
            .setTitle(R.string.input_dialog_title)
            .setView(view)
            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
               def onClick(dialog: DialogInterface, which: Int) {
-                mWord = view.findViewById(R.id.input_text).asInstanceOf[EditText].getText.toString
+                mWord = editText.getText.toString
                 setupViews()
               }
            })
@@ -160,8 +164,7 @@ class MushroomActivity extends ListActivity {
   }
 
   private def onCopyWord(word: String) {
-    val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-    clipboardManager.setText(word)
+    mClipboard.setText(word)
     Toast.makeText(this, R.string.toast_copy_word, Toast.LENGTH_LONG).show()
   }
 
