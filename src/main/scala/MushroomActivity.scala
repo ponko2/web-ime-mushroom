@@ -160,7 +160,8 @@ class MushroomActivity extends ListActivity {
   private def onTransliterate() {
     mTasks = Seq(new TransliterateTask(GoogleJapaneseInput).execute(mWord),
                  new TransliterateTask(GoogleSuggest).execute(mWord),
-                 new TransliterateTask(SocialIME).execute(mWord))
+                 new TransliterateTask(SocialIME).execute(mWord),
+                 new TransliterateTask(SocialImePredict).execute(mWord))
   }
 
   private def onCopyWord(word: String) {
