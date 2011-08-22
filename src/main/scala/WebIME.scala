@@ -27,6 +27,19 @@ object SocialIME extends WebIME {
   }
 }
 
+object SocialImePredict extends WebIME {
+  val tag = "Social IME Predict"
+  val api = :/("www.social-ime.com") / "api2" / "predict.php"
+
+  def transliterate(text:String) = {
+    require(text.nonEmpty)
+
+    api <<? Map("charset" -> "UTF-8", "string" -> text) >- {
+      tsv => tsv.stripLineEnd.split("[\t\n\r]+")
+    }
+  }
+}
+
 object GoogleJapaneseInput extends WebIME {
   val tag = "Google Japanese Input"
   val api = :/("www.google.com") / "transliterate"
