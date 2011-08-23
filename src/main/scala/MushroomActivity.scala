@@ -19,7 +19,8 @@ import dispatch.StatusCode
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
-  private var mAPI:   ArrayBuffer[WebIME] = ArrayBuffer()
+  private var mInputWord = ""
+  private var mApiSettings: ArrayBuffer[WebIME] = ArrayBuffer()
   private var mTasks: ArrayBuffer[AsyncTask[String, Nothing, Either[Throwable, Int]]] = ArrayBuffer()
 
   private lazy val mReplaceWord = getReplaceWord()
@@ -29,15 +30,27 @@ class MushroomActivity extends ListActivity {
   private lazy val mDatabase    = new WordDatabase(this).getWritableDatabase
   private lazy val mAdapter     = new WordsAdapter(this, initializeCursor(mReplaceWord))
 
-  override def onCreate(savedInstanceState: Bundle) {
+  override protected def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
     setupProgress()
     setContentView(R.layout.main)
-    setupAPI()
+    mApiSettings = getApiSettings()
     setupViews()
 
     onTransliterate(mReplaceWord)
+  }
+
+  override protected def onRestart() {
+    super.onRestart()
+
+    val apiSettings = getApiSettings()
+    if (!mApiSettings.sameElements(apiSettings)) {
+      mApiSettings = apiSettings
+      val word = if (mInputWord.nonEmpty) mInputWord else mReplaceWord
+      mAdapter.changeCursor(initializeCursor(word))
+      onTransliterate(word)
+    }
   }
 
   private def getReplaceWord(): String = {
@@ -50,19 +63,21 @@ class MushroomActivity extends ListActivity {
     }
   }
 
-  private def setupAPI() {
+  private def getApiSettings(): ArrayBuffer[WebIME] = {
+    var result: ArrayBuffer[WebIME] = ArrayBuffer()
     if (mPreferences.getBoolean(Preferences.KEY_GOOGLE_JAPANESE_INPUT, true)) {
-      mAPI += GoogleJapaneseInput
+      result += GoogleJapaneseInput
     }
     if (mPreferences.getBoolean(Preferences.KEY_GOOGLE_SUGGEST, true)) {
-      mAPI += GoogleSuggest
+      result += GoogleSuggest
     }
     if (mPreferences.getBoolean(Preferences.KEY_SOCIAL_IME, true)) {
-      mAPI += SocialIME
+      result += SocialIME
     }
     if (mPreferences.getBoolean(Preferences.KEY_SOCIAL_IME_PREDICT, true)) {
-      mAPI += SocialImePredict
+      result += SocialImePredict
     }
+    result
   }
 
   private def setupViews() {
@@ -164,9 +179,9 @@ class MushroomActivity extends ListActivity {
            .setView(view)
            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
               def onClick(dialog: DialogInterface, which: Int) {
-                val word = editText.getText.toString
-                mAdapter.changeCursor(initializeCursor(word))
-                onTransliterate(word)
+                mInputWord = editText.getText.toString
+                mAdapter.changeCursor(initializeCursor(mInputWord))
+                onTransliterate(mInputWord)
               }
            })
            .create()
@@ -177,7 +192,7 @@ class MushroomActivity extends ListActivity {
 
   private def onTransliterate(word: String) {
     if (word.nonEmpty) {
-      mAPI.foreach(api => mTasks += new TransliterateTask(api).execute(word))
+      mApiSettings.foreach(api => mTasks += new TransliterateTask(api).execute(word))
     } else {
       showDialog(INPUT_DIALOG)
     }
@@ -228,12 +243,12 @@ class MushroomActivity extends ListActivity {
   }
 
   private def initializeCursor(word: String): Cursor = {
-    val selection = if (mAPI.nonEmpty && word.nonEmpty) {
+    val selection = if (mApiSettings.nonEmpty && word.nonEmpty) {
       WordDatabase.COLUMN_INPUT + "=? and " +
-        mAPI.map(api => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")")
+        mApiSettings.map(api => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")")
     } else { "0 = 1" }
-    val selectionArgs = if (mAPI.nonEmpty && word.nonEmpty) {
-      mAPI./:(ArrayBuffer(word)) { (buffer, api) => buffer += api.tag }.toArray
+    val selectionArgs = if (mApiSettings.nonEmpty && word.nonEmpty) {
+      mApiSettings./:(ArrayBuffer(word)) { (buffer, api) => buffer += api.tag }.toArray
     } else { null }
 
     val cursor = mDatabase.query(
