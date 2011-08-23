@@ -9,9 +9,9 @@ object Preferences {
   final val KEY_SOCIAL_IME_PREDICT    = "webime.social_ime_predict"
 
   def apiSettings(): Map[String, WebIME] = {
-    Map(Preferences.KEY_GOOGLE_JAPANESE_INPUT -> GoogleJapaneseInput
-       ,Preferences.KEY_GOOGLE_SUGGEST        -> GoogleSuggest
-       ,Preferences.KEY_SOCIAL_IME            -> SocialIME
-       ,Preferences.KEY_SOCIAL_IME_PREDICT    -> SocialImePredict)
+    Map(KEY_GOOGLE_JAPANESE_INPUT -> GoogleJapaneseInput
+       ,KEY_GOOGLE_SUGGEST        -> GoogleSuggest
+       ,KEY_SOCIAL_IME            -> SocialIME
+       ,KEY_SOCIAL_IME_PREDICT    -> SocialImePredict)
   }
 }
