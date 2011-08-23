@@ -19,38 +19,34 @@ import dispatch.StatusCode
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
-  private var mWord:        String            = _
-  private var mReplaceKey:  Boolean           = _
-  private var mDatabase:    SQLiteDatabase    = _
-  private var mAdapter:     WordsAdapter      = _
-  private var mClipboard:   ClipboardManager  = _
-  private var mPreferences: SharedPreferences = _
-  private var mAPI:         ArrayBuffer[WebIME] = ArrayBuffer()
-  private var mTasks:       ArrayBuffer[AsyncTask[String, Nothing, Either[Throwable, Int]]] = ArrayBuffer()
-  private val mHttp = new Http with Threads
+  private var mAPI:   ArrayBuffer[WebIME] = ArrayBuffer()
+  private var mTasks: ArrayBuffer[AsyncTask[String, Nothing, Either[Throwable, Int]]] = ArrayBuffer()
+
+  private lazy val mReplaceWord = getReplaceWord()
+  private lazy val mPreferences = getSharedPreferences(Preferences.NAME, Context.MODE_PRIVATE)
+  private lazy val mClipboard   = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+  private lazy val mHttp        = new Http with Threads
+  private lazy val mDatabase    = new WordDatabase(this).getWritableDatabase
+  private lazy val mAdapter     = new WordsAdapter(this, initializeCursor(mReplaceWord))
 
   override def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
-    mDatabase    = new WordDatabase(this).getWritableDatabase
-    mPreferences = getSharedPreferences(Preferences.NAME, Context.MODE_PRIVATE)
-    mClipboard   = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-
     setupProgress()
-    setupReplaceKey()
-    setupAPI()
     setContentView(R.layout.main)
+    setupAPI()
     setupViews()
+
+    onTransliterate(mReplaceWord)
   }
 
-  private def setupReplaceKey() {
+  private def getReplaceWord(): String = {
     val intent = getIntent()
     val action = intent.getAction()
     if (action != null && ACTION_INTERCEPT == action) {
-      mWord = intent.getStringExtra(REPLACE_KEY)
-      mReplaceKey = true
+      intent.getStringExtra(REPLACE_KEY)
     } else {
-      mReplaceKey = false
+      ""
     }
   }
 
@@ -70,14 +66,8 @@ class MushroomActivity extends ListActivity {
   }
 
   private def setupViews() {
-    if (mWord != null && mWord.nonEmpty) {
-      mAdapter = new WordsAdapter(this, initializeCursor())
-      setListAdapter(mAdapter)
-      registerForContextMenu(getListView())
-      onTransliterate()
-    } else {
-      showDialog(INPUT_DIALOG)
-    }
+    setListAdapter(mAdapter)
+    registerForContextMenu(getListView())
   }
 
   override def onCreateOptionsMenu(menu: Menu): Boolean = {
@@ -152,7 +142,7 @@ class MushroomActivity extends ListActivity {
     onAddHistory(description.id)
 
     val intent = new Intent()
-    if (mReplaceKey) {
+    if (mReplaceWord.nonEmpty) {
       intent.putExtra(REPLACE_KEY, result)
     } else {
       onCopyWord(result)
@@ -174,8 +164,9 @@ class MushroomActivity extends ListActivity {
            .setView(view)
            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
               def onClick(dialog: DialogInterface, which: Int) {
-                mWord = editText.getText.toString
-                setupViews()
+                val word = editText.getText.toString
+                mAdapter.changeCursor(initializeCursor(word))
+                onTransliterate(word)
               }
            })
            .create()
@@ -184,8 +175,12 @@ class MushroomActivity extends ListActivity {
     }
   }
 
-  private def onTransliterate() {
-    mAPI.foreach(api => mTasks += new TransliterateTask(api).execute(mWord))
+  private def onTransliterate(word: String) {
+    if (word.nonEmpty) {
+      mAPI.foreach(api => mTasks += new TransliterateTask(api).execute(word))
+    } else {
+      showDialog(INPUT_DIALOG)
+    }
   }
 
   private def onCopyWord(word: String) {
@@ -232,13 +227,13 @@ class MushroomActivity extends ListActivity {
       setProgressBarIndeterminateVisibility(false)
   }
 
-  private def initializeCursor(): Cursor = {
-    val selection = if (mAPI.nonEmpty) {
+  private def initializeCursor(word: String): Cursor = {
+    val selection = if (mAPI.nonEmpty && word.nonEmpty) {
       WordDatabase.COLUMN_INPUT + "=? and " +
         mAPI.map(api => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")")
     } else { "0 = 1" }
-    val selectionArgs = if (mAPI.nonEmpty) {
-      mAPI./:(ArrayBuffer(mWord)) { (buffer, api) => buffer += api.tag }.toArray
+    val selectionArgs = if (mAPI.nonEmpty && word.nonEmpty) {
+      mAPI./:(ArrayBuffer(word)) { (buffer, api) => buffer += api.tag }.toArray
     } else { null }
 
     val cursor = mDatabase.query(
