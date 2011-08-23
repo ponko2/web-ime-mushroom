@@ -10,7 +10,6 @@ import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, Ed
 import _root_.android.text.ClipboardManager
 
 import scala.util.control.Exception._
-import scala.collection.mutable.ArrayBuffer
 
 import dispatch.Http
 import dispatch.Threads
@@ -20,15 +19,15 @@ class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
   private var mInputWord = ""
-  private var mApiSettings: ArrayBuffer[WebIME] = ArrayBuffer()
-  private var mTasks: ArrayBuffer[AsyncTask[String, Nothing, Either[Throwable, Int]]] = ArrayBuffer()
+  private var mApiSettings: Seq[WebIME] = Seq()
+  private var mTasks: Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = Seq()
 
   private lazy val mReplaceWord = getReplaceWord()
   private lazy val mPreferences = getSharedPreferences(Preferences.NAME, Context.MODE_PRIVATE)
   private lazy val mClipboard   = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-  private lazy val mHttp        = new Http with Threads
-  private lazy val mDatabase    = new WordDatabase(this).getWritableDatabase
-  private lazy val mAdapter     = new WordsAdapter(this, initializeCursor(mReplaceWord))
+  private lazy val mHttp     = new Http with Threads
+  private lazy val mDatabase = new WordDatabase(this).getWritableDatabase
+  private lazy val mAdapter  = new WordsAdapter(this, initializeCursor(mReplaceWord))
 
   override protected def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
@@ -45,7 +44,7 @@ class MushroomActivity extends ListActivity {
     super.onRestart()
 
     val apiSettings = getApiSettings()
-    if (!mApiSettings.sameElements(apiSettings)) {
+    if (mApiSettings != apiSettings) {
       mApiSettings = apiSettings
       val word = if (mInputWord.nonEmpty) mInputWord else mReplaceWord
       mAdapter.changeCursor(initializeCursor(word))
@@ -63,21 +62,8 @@ class MushroomActivity extends ListActivity {
     }
   }
 
-  private def getApiSettings(): ArrayBuffer[WebIME] = {
-    var result: ArrayBuffer[WebIME] = ArrayBuffer()
-    if (mPreferences.getBoolean(Preferences.KEY_GOOGLE_JAPANESE_INPUT, true)) {
-      result += GoogleJapaneseInput
-    }
-    if (mPreferences.getBoolean(Preferences.KEY_GOOGLE_SUGGEST, true)) {
-      result += GoogleSuggest
-    }
-    if (mPreferences.getBoolean(Preferences.KEY_SOCIAL_IME, true)) {
-      result += SocialIME
-    }
-    if (mPreferences.getBoolean(Preferences.KEY_SOCIAL_IME_PREDICT, true)) {
-      result += SocialImePredict
-    }
-    result
+  private def getApiSettings(): Seq[WebIME] = {
+    Preferences.apiSettings.filterKeys(key => mPreferences.getBoolean(key, true)).values.toSeq
   }
 
   private def setupViews() {
@@ -192,7 +178,7 @@ class MushroomActivity extends ListActivity {
 
   private def onTransliterate(word: String) {
     if (word.nonEmpty) {
-      mApiSettings.foreach(api => mTasks += new TransliterateTask(api).execute(word))
+      mTasks = mApiSettings.map(api => new TransliterateTask(api).execute(word))
     } else {
       showDialog(INPUT_DIALOG)
     }
@@ -248,7 +234,7 @@ class MushroomActivity extends ListActivity {
         mApiSettings.map(api => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")")
     } else { "0 = 1" }
     val selectionArgs = if (mApiSettings.nonEmpty && word.nonEmpty) {
-      mApiSettings./:(ArrayBuffer(word)) { (buffer, api) => buffer += api.tag }.toArray
+      Array(word) ++ mApiSettings.map(api => api.tag)
     } else { null }
 
     val cursor = mDatabase.query(
