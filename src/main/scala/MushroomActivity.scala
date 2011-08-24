@@ -1,8 +1,8 @@
 package jp.ponko2.android.webime
 
-import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog}
+import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog, SearchManager}
 import _root_.android.os.{Bundle, AsyncTask}
-import _root_.android.content.{Context, ContentValues, Intent, DialogInterface}
+import _root_.android.content.{Context, ContentValues, Intent, DialogInterface, SharedPreferences}
 import _root_.android.database.Cursor
 import _root_.android.database.sqlite.SQLiteDatabase
 import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
@@ -18,44 +18,57 @@ import dispatch.StatusCode
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
-  private var mWord:       String         = _
-  private var mReplaceKey: Boolean        = _
-  private var mDatabase:   SQLiteDatabase = _
-  private var mAdapter:    WordsAdapter   = _
-  private var mTasks:      Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = _
-  private val mHttp = new Http with Threads
+  private var mInputWord = ""
+  private var mApiSettings: Seq[WebIME] = Seq()
+  private var mTasks: Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = Seq()
 
-  override def onCreate(savedInstanceState: Bundle) {
+  private lazy val mReplaceWord = getReplaceWord()
+  private lazy val mPreferences = getSharedPreferences(Preferences.NAME, Context.MODE_PRIVATE)
+  private lazy val mClipboard   = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+  private lazy val mHttp     = new Http with Threads
+  private lazy val mDatabase = new WordDatabase(this).getWritableDatabase
+  private lazy val mAdapter  = new WordsAdapter(this, initializeCursor(mReplaceWord))
+
+  override protected def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
 
-    mDatabase = new WordDatabase(this).getWritableDatabase
-
     setupProgress()
-    setupReplaceKey()
     setContentView(R.layout.main)
+    mApiSettings = getApiSettings()
     setupViews()
+
+    onTransliterate(mReplaceWord)
   }
 
-  private def setupReplaceKey() {
+  override protected def onRestart() {
+    super.onRestart()
+
+    val apiSettings = getApiSettings()
+    if (mApiSettings != apiSettings) {
+      mApiSettings = apiSettings
+      val word = if (mInputWord.nonEmpty) mInputWord else mReplaceWord
+      mAdapter.changeCursor(initializeCursor(word))
+      onTransliterate(word)
+    }
+  }
+
+  private def getReplaceWord(): String = {
     val intent = getIntent()
     val action = intent.getAction()
     if (action != null && ACTION_INTERCEPT == action) {
-      mWord = intent.getStringExtra(REPLACE_KEY)
-      mReplaceKey = true
+      intent.getStringExtra(REPLACE_KEY)
     } else {
-      mReplaceKey = false
+      ""
     }
   }
 
+  private def getApiSettings(): Seq[WebIME] = {
+    Preferences.apiSettings.filterKeys(key => mPreferences.getBoolean(key, true)).values.toSeq
+  }
+
   private def setupViews() {
-    if (mWord != null && mWord.nonEmpty) {
-      mAdapter = new WordsAdapter(this, initializeCursor())
-      setListAdapter(mAdapter)
-      registerForContextMenu(getListView())
-      onTransliterate()
-    } else {
-      showDialog(INPUT_DIALOG)
-    }
+    setListAdapter(mAdapter)
+    registerForContextMenu(getListView())
   }
 
   override def onCreateOptionsMenu(menu: Menu): Boolean = {
@@ -65,6 +78,9 @@ class MushroomActivity extends ListActivity {
 
   override def onMenuItemSelected(featureId: Int, item: MenuItem): Boolean = {
     item.getItemId match {
+      case R.id.menu_item_settings =>
+        SettingsActivity.show(this)
+        true
       case R.id.menu_item_delete =>
         onRemoveAllWord()
         true
@@ -81,19 +97,23 @@ class MushroomActivity extends ListActivity {
 
     menu.add(0, MENU_ID_COPY,   0, R.string.context_menu_copy_word)
     menu.add(0, MENU_ID_DELETE, 0, R.string.context_menu_delete_word)
+    menu.add(0, MENU_ID_SEARCH, 0, R.string.context_menu_search_word)
   }
 
   override def onContextItemSelected(item: MenuItem): Boolean = {
     val info = item.getMenuInfo.asInstanceOf[AdapterView.AdapterContextMenuInfo]
     val description = info.targetView.getTag.asInstanceOf[WordDescription]
+    val word = info.targetView.asInstanceOf[TextView].getText.toString
 
     item.getItemId match {
       case MENU_ID_COPY =>
-        val word = info.targetView.asInstanceOf[TextView].getText.toString
         onCopyWord(word)
         true
       case MENU_ID_DELETE =>
         onRemoveWord(description.id)
+        true
+      case MENU_ID_SEARCH =>
+        onSearchWord(word)
         true
       case _ =>
         super.onContextItemSelected(item)
@@ -123,7 +143,7 @@ class MushroomActivity extends ListActivity {
     onAddHistory(description.id)
 
     val intent = new Intent()
-    if (mReplaceKey) {
+    if (mReplaceWord.nonEmpty) {
       intent.putExtra(REPLACE_KEY, result)
     } else {
       onCopyWord(result)
@@ -137,14 +157,17 @@ class MushroomActivity extends ListActivity {
       case INPUT_DIALOG => {
         val inflater = LayoutInflater.from(this)
         val view     = inflater.inflate(R.layout.input_dialog, null)
+        val editText = view.findViewById(R.id.input_text).asInstanceOf[EditText]
+        editText.setText(mClipboard.getText)
         new AlertDialog.Builder(MushroomActivity.this)
            .setIcon(android.R.drawable.ic_dialog_info)
            .setTitle(R.string.input_dialog_title)
            .setView(view)
            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
               def onClick(dialog: DialogInterface, which: Int) {
-                mWord = view.findViewById(R.id.input_text).asInstanceOf[EditText].getText.toString
-                setupViews()
+                mInputWord = editText.getText.toString
+                mAdapter.changeCursor(initializeCursor(mInputWord))
+                onTransliterate(mInputWord)
               }
            })
            .create()
@@ -153,15 +176,16 @@ class MushroomActivity extends ListActivity {
     }
   }
 
-  private def onTransliterate() {
-    mTasks = Seq(new TransliterateTask(GoogleJapaneseInput).execute(mWord),
-                 new TransliterateTask(GoogleSuggest).execute(mWord),
-                 new TransliterateTask(SocialIME).execute(mWord))
+  private def onTransliterate(word: String) {
+    if (word.nonEmpty) {
+      mTasks = mApiSettings.map(api => new TransliterateTask(api).execute(word))
+    } else {
+      showDialog(INPUT_DIALOG)
+    }
   }
 
   private def onCopyWord(word: String) {
-    val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-    clipboardManager.setText(word)
+    mClipboard.setText(word)
     Toast.makeText(this, R.string.toast_copy_word, Toast.LENGTH_LONG).show()
   }
 
@@ -176,6 +200,12 @@ class MushroomActivity extends ListActivity {
   private def onRemoveWord(id: String) {
     val rows = mDatabase.delete(WordDatabase.TABLE_WORDS, WordDatabase._ID + "=?", Array(id))
     if (rows > 0) mAdapter.refresh()
+  }
+
+  private def onSearchWord(word: String) {
+    val intent = new Intent(Intent.ACTION_WEB_SEARCH)
+    intent.putExtra(SearchManager.QUERY, word)
+    startActivity(intent)
   }
 
   private def onRemoveAllWord() {
@@ -198,11 +228,19 @@ class MushroomActivity extends ListActivity {
       setProgressBarIndeterminateVisibility(false)
   }
 
-  private def initializeCursor(): Cursor = {
+  private def initializeCursor(word: String): Cursor = {
+    val selection = if (mApiSettings.nonEmpty && word.nonEmpty) {
+      WordDatabase.COLUMN_INPUT + "=? and " +
+        mApiSettings.map(api => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")")
+    } else { "0 = 1" }
+    val selectionArgs = if (mApiSettings.nonEmpty && word.nonEmpty) {
+      Array(word) ++ mApiSettings.map(api => api.tag)
+    } else { null }
+
     val cursor = mDatabase.query(
       WordDatabase.TABLE_WORDS,
       Array(WordDatabase._ID, WordDatabase.COLUMN_API, WordDatabase.COLUMN_RESULT, WordDatabase.COLUMN_SEPARATOR),
-      WordDatabase.COLUMN_INPUT + "=?", Array(mWord), null, null, WordDatabase.SORT_DEFAULT)
+      selection, selectionArgs, null, null, WordDatabase.SORT_DEFAULT)
 
     startManagingCursor(cursor)
     cursor
@@ -288,6 +326,7 @@ object MushroomActivity {
   private final val REPLACE_KEY      = "replace_key"
   private final val MENU_ID_COPY     = 1
   private final val MENU_ID_DELETE   = 2
+  private final val MENU_ID_SEARCH   = 3
   private final val INPUT_DIALOG     = 42
 
   private class WordDescription {

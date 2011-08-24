@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+   xmlns:android="http://schemas.android.com/apk/res/android">
+   <PreferenceCategory android:title="@string/api_preferences">
+      <CheckBoxPreference
+         android:key="webime.google_japanese_input"
+         android:defaultValue="true"
+         android:title="@string/title_google_japanese_input_preference"
+         android:summary="@string/summary_google_japanese_input_preference"/>
+      <CheckBoxPreference
+         android:key="webime.google_suggest"
+         android:defaultValue="true"
+         android:title="@string/title_google_suggest_preference"
+         android:summary="@string/summary_google_suggest_preference"/>
+      <CheckBoxPreference
+         android:key="webime.social_ime"
+         android:defaultValue="true"
+         android:title="@string/title_social_ime_preference"
+         android:summary="@string/summary_social_ime_preference"/>
+      <CheckBoxPreference
+         android:key="webime.social_ime_predict"
+         android:defaultValue="true"
+         android:title="@string/title_social_ime_predict_preference"
+         android:summary="@string/summary_social_ime_predict_preference"/>
+   </PreferenceCategory>
+</PreferenceScreen>
