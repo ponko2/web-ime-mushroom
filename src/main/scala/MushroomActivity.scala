@@ -54,11 +54,9 @@ class MushroomActivity extends ListActivity {
 
   private def getReplaceWord(): String = {
     val intent = getIntent()
-    val action = intent.getAction()
-    if (action != null && ACTION_INTERCEPT == action) {
-      intent.getStringExtra(REPLACE_KEY)
-    } else {
-      ""
+    Option(intent.getAction()) match {
+      case Some(action) if action == ACTION_INTERCEPT => intent.getStringExtra(REPLACE_KEY)
+      case _ => ""
     }
   }
 
@@ -124,12 +122,12 @@ class MushroomActivity extends ListActivity {
     super.onDestroy()
 
     def cancel(task: AsyncTask[_, _, _]) {
-      if (task != null && task.getStatus == AsyncTask.Status.RUNNING) {
+      if (task.getStatus == AsyncTask.Status.RUNNING) {
         task cancel true
       }
     }
 
-    if (mTasks != null) mTasks.foreach(cancel)
+    mTasks.foreach(cancel)
 
     mDatabase.close()
     mHttp.shutdown()
@@ -212,7 +210,7 @@ class MushroomActivity extends ListActivity {
     val rows = mDatabase.delete(WordDatabase.TABLE_WORDS, null, null)
     if (rows > 0) {
       Toast.makeText(this, R.string.toast_remove_cache, Toast.LENGTH_LONG).show()
-      if (mAdapter != null) mAdapter.refresh()
+      mAdapter.refresh()
     }
   }
 
@@ -224,7 +222,7 @@ class MushroomActivity extends ListActivity {
   private def showProgress() = setProgressBarIndeterminateVisibility(true)
 
   private def hideProgress() = {
-    if (mTasks.count(task => task != null && task.getStatus == AsyncTask.Status.RUNNING) <= 1)
+    if (mTasks.count(task => task.getStatus == AsyncTask.Status.RUNNING) <= 1)
       setProgressBarIndeterminateVisibility(false)
   }
 
