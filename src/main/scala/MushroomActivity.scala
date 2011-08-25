@@ -8,6 +8,7 @@ import _root_.android.database.sqlite.SQLiteDatabase
 import _root_.android.view.{Window, ContextMenu, Menu, MenuItem, View, ViewGroup, LayoutInflater}
 import _root_.android.widget.{AdapterView, CursorAdapter, ListView, TextView, EditText, Toast}
 import _root_.android.text.ClipboardManager
+import _root_.android.util.Log
 
 import scala.util.control.Exception._
 
@@ -253,13 +254,6 @@ class MushroomActivity extends ListActivity {
     requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS)
   }
 
-  private def showProgress() = setProgressBarIndeterminateVisibility(true)
-
-  private def hideProgress() = {
-    if (mTasks.count(task => task.getStatus == AsyncTask.Status.RUNNING) <= 1)
-      setProgressBarIndeterminateVisibility(false)
-  }
-
   private def initializeCursor(word: String): Cursor = {
     val selection = if (mApiSettings.nonEmpty && word.nonEmpty) {
       WordDatabase.COLUMN_INPUT + "=? and " +
@@ -279,13 +273,13 @@ class MushroomActivity extends ListActivity {
   }
 
   private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Nothing, Either[Throwable, Int]] {
-    override def onPreExecute() = showProgress()
+    override protected def onPreExecute() = showProgress()
 
-    def doInBackground(param: String): Either[Throwable, Int] = {
+    override protected def doInBackground(param: String): Either[Throwable, Int] = {
       allCatch either WordDatabase.addWords(mDatabase, webIME.tag, param, mHttp(webIME.transliterate(param)))
     }
 
-    override def onPostExecute(result: Either[Throwable, Int]) {
+    override protected def onPostExecute(result: Either[Throwable, Int]) {
       hideProgress()
       result match {
         case Right(count) => if (count > 0) mAdapter.refresh()
@@ -298,22 +292,43 @@ class MushroomActivity extends ListActivity {
         }
       }
     }
+
+    private def showProgress() = {
+      setProgressBarVisibility(true)
+      setProgressBarIndeterminateVisibility(true)
+    }
+
+    private def hideProgress() = {
+      val task_count = mTasks.size.toDouble
+      val running_task_count = mTasks.count(task => task.getStatus == AsyncTask.Status.RUNNING)
+
+      try {
+        setProgress((10000 * (1 - (running_task_count - 1) / task_count)).toInt)
+      } catch {
+        case e => setProgress(10000)
+      }
+
+      if (running_task_count <= 1) {
+        setProgressBarVisibility(false)
+        setProgressBarIndeterminateVisibility(false)
+      }
+    }
   }
 
   private class AddDictionaryTask extends AsyncTask1[(String, String), Nothing, Either[Throwable, String]] {
-    override def onPreExecute() {
+    override protected def onPreExecute() {
       mProgress.setProgressStyle(ProgressDialog.STYLE_SPINNER)
       mProgress.setMessage(getString(R.string.progress_add_dictionary_task))
       mProgress.setCancelable(true)
       mProgress.show()
     }
 
-    def doInBackground(param: (String, String)): Either[Throwable, String] = {
+    override protected def doInBackground(param: (String, String)): Either[Throwable, String] = {
       val (yomi, word) = param
       allCatch either mHttp(SocialIME.addDictionary(yomi, word))
     }
 
-    override def onPostExecute(result: Either[Throwable, String]) {
+    override protected def onPostExecute(result: Either[Throwable, String]) {
       mProgress.dismiss()
 
       result match {
