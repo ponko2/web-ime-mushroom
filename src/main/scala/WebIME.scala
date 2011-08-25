@@ -18,6 +18,14 @@ object SocialIME extends WebIME {
   val tag = "Social IME"
   val api = :/("www.social-ime.com") / "api"
 
+  def addDictionary(yomi: String, word: String): Handler[Boolean] = {
+    require(yomi.nonEmpty && word.nonEmpty)
+
+    api <<? Map("method" -> "dic_add", "yomi" -> yomi, "word" -> word, "charset" -> "UTF-8") >- {
+      result => result.contains(Seq("dic_add:", yomi, word).mkString(" "))
+    }
+  }
+
   def transliterate(text:String) = {
     require(text.nonEmpty)
 
