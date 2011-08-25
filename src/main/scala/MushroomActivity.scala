@@ -1,6 +1,6 @@
 package jp.ponko2.android.webime
 
-import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog, SearchManager}
+import _root_.android.app.{Activity, ListActivity, Dialog, AlertDialog, ProgressDialog, SearchManager}
 import _root_.android.os.{Bundle, AsyncTask}
 import _root_.android.content.{Context, ContentValues, Intent, DialogInterface, SharedPreferences}
 import _root_.android.database.Cursor
@@ -21,11 +21,13 @@ class MushroomActivity extends ListActivity {
   private var mInputWord = ""
   private var mApiSettings: Seq[WebIME] = Seq()
   private var mTasks: Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = Seq()
+  private var mAddDictionaryTask: AsyncTask[(String, String), Nothing, Either[Throwable, String]] = _
 
   private lazy val mReplaceWord = getReplaceWord()
   private lazy val mPreferences = getSharedPreferences(Preferences.NAME, Context.MODE_PRIVATE)
   private lazy val mClipboard   = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   private lazy val mHttp     = new Http with Threads
+  private lazy val mProgress = new ProgressDialog(this)
   private lazy val mDatabase = new WordDatabase(this).getWritableDatabase
   private lazy val mAdapter  = new WordsAdapter(this, initializeCursor(mReplaceWord))
 
@@ -82,6 +84,9 @@ class MushroomActivity extends ListActivity {
       case R.id.menu_item_delete =>
         onRemoveAllWord()
         true
+      case R.id.menu_item_dictionary =>
+        showDialog(DICTIONARY_DIALOG)
+        true
       case _ =>
         super.onMenuItemSelected(featureId, item)
     }
@@ -121,13 +126,16 @@ class MushroomActivity extends ListActivity {
   override protected def onDestroy() {
     super.onDestroy()
 
-    def cancel(task: AsyncTask[_, _, _]) {
-      if (task.getStatus == AsyncTask.Status.RUNNING) {
-        task cancel true
+    def cancel(asyncTask: AsyncTask[_, _, _]) {
+      Option(asyncTask) match {
+        case Some(task) if task.getStatus == AsyncTask.Status.RUNNING =>
+          task cancel true
+        case _ =>
       }
     }
 
     mTasks.foreach(cancel)
+    cancel(mAddDictionaryTask)
 
     mDatabase.close()
     mHttp.shutdown()
@@ -152,26 +160,52 @@ class MushroomActivity extends ListActivity {
 
   override protected def onCreateDialog(id: Int): Dialog = {
     id match {
-      case INPUT_DIALOG => {
-        val inflater = LayoutInflater.from(this)
-        val view     = inflater.inflate(R.layout.input_dialog, null)
-        val editText = view.findViewById(R.id.input_text).asInstanceOf[EditText]
-        editText.setText(mClipboard.getText)
-        new AlertDialog.Builder(MushroomActivity.this)
-           .setIcon(android.R.drawable.ic_dialog_info)
-           .setTitle(R.string.input_dialog_title)
-           .setView(view)
-           .setPositiveButton("OK", new DialogInterface.OnClickListener() {
-              def onClick(dialog: DialogInterface, which: Int) {
-                mInputWord = editText.getText.toString
-                mAdapter.changeCursor(initializeCursor(mInputWord))
-                onTransliterate(mInputWord)
-              }
-           })
-           .create()
-      }
-      case _ => null
+      case INPUT_DIALOG      => createInputDialog()
+      case DICTIONARY_DIALOG => createDictionaryDialog()
+      case _                 => null
     }
+  }
+
+  private def createInputDialog(): Dialog = {
+    val inflater = LayoutInflater.from(this)
+    val view     = inflater.inflate(R.layout.input_dialog, null)
+    val editText = view.findViewById(R.id.input_text).asInstanceOf[EditText]
+    editText.setText(mClipboard.getText)
+    new AlertDialog.Builder(MushroomActivity.this)
+       .setIcon(android.R.drawable.ic_dialog_info)
+       .setTitle(R.string.input_dialog_title)
+       .setView(view)
+       .setPositiveButton(R.string.positive_button, new DialogInterface.OnClickListener() {
+          def onClick(dialog: DialogInterface, which: Int) {
+            mInputWord = editText.getText.toString
+            mAdapter.changeCursor(initializeCursor(mInputWord))
+            onTransliterate(mInputWord)
+          }
+       })
+       .create()
+  }
+
+  private def createDictionaryDialog(): Dialog = {
+    val inflater = LayoutInflater.from(this)
+    val view = inflater.inflate(R.layout.dictionary_dialog, null)
+    val yomi = view.findViewById(R.id.dictionary_yomi).asInstanceOf[EditText]
+    val word = view.findViewById(R.id.dictionary_word).asInstanceOf[EditText]
+    yomi.setText(if (mInputWord.nonEmpty) mInputWord else mReplaceWord)
+    new AlertDialog.Builder(MushroomActivity.this)
+       .setIcon(android.R.drawable.ic_dialog_alert)
+       .setTitle(R.string.dictionary_dialog_title)
+       .setView(view)
+       .setPositiveButton(R.string.positive_button, new DialogInterface.OnClickListener() {
+          def onClick(dialog: DialogInterface, which: Int) {
+            mAddDictionaryTask = new AddDictionaryTask().execute(
+              (yomi.getText.toString, word.getText.toString)
+            )
+          }
+       })
+       .setNegativeButton(R.string.negative_button, new DialogInterface.OnClickListener() {
+          def onClick(dialog: DialogInterface, which: Int) { }
+       })
+       .create()
   }
 
   private def onTransliterate(word: String) {
@@ -266,6 +300,43 @@ class MushroomActivity extends ListActivity {
     }
   }
 
+  private class AddDictionaryTask extends AsyncTask1[(String, String), Nothing, Either[Throwable, String]] {
+    override def onPreExecute() {
+      mProgress.setProgressStyle(ProgressDialog.STYLE_SPINNER)
+      mProgress.setMessage(getString(R.string.progress_add_dictionary_task))
+      mProgress.setCancelable(true)
+      mProgress.show()
+    }
+
+    def doInBackground(param: (String, String)): Either[Throwable, String] = {
+      val (yomi, word) = param
+      allCatch either mHttp(SocialIME.addDictionary(yomi, word))
+    }
+
+    override def onPostExecute(result: Either[Throwable, String]) {
+      mProgress.dismiss()
+
+      result match {
+        case Right(word) if word.nonEmpty =>
+          Toast.makeText(MushroomActivity.this,
+            R.string.complete_add_dictionary_task, Toast.LENGTH_LONG).show()
+          if (word != mInputWord && word != mReplaceWord) {
+            mAdapter.changeCursor(initializeCursor(word))
+          }
+          onTransliterate(word)
+        case Left(StatusCode(code, _)) =>
+          Toast.makeText(MushroomActivity.this,
+            SocialIME.tag + " - Http Status: " + code, Toast.LENGTH_LONG).show()
+        case Left(e) if e.isInstanceOf[IllegalArgumentException] =>
+          Toast.makeText(MushroomActivity.this,
+            R.string.failure_length_add_dictionary_task, Toast.LENGTH_LONG).show()
+        case _ =>
+          Toast.makeText(MushroomActivity.this,
+            R.string.failure_add_dictionary_task, Toast.LENGTH_LONG).show()
+      }
+    }
+  }
+
   private class WordsAdapter(context: Context, cursor: Cursor) extends CursorAdapter(context, cursor, true) {
     private final val mInflater      = LayoutInflater.from(context)
     private final val mId            = cursor.getColumnIndexOrThrow(WordDatabase._ID)
@@ -320,12 +391,13 @@ class MushroomActivity extends ListActivity {
 }
 
 object MushroomActivity {
-  private final val ACTION_INTERCEPT = "com.adamrocker.android.simeji.ACTION_INTERCEPT"
-  private final val REPLACE_KEY      = "replace_key"
-  private final val MENU_ID_COPY     = 1
-  private final val MENU_ID_DELETE   = 2
-  private final val MENU_ID_SEARCH   = 3
-  private final val INPUT_DIALOG     = 42
+  private final val ACTION_INTERCEPT  = "com.adamrocker.android.simeji.ACTION_INTERCEPT"
+  private final val REPLACE_KEY       = "replace_key"
+  private final val MENU_ID_COPY      = 1
+  private final val MENU_ID_DELETE    = 2
+  private final val MENU_ID_SEARCH    = 3
+  private final val INPUT_DIALOG      = 42
+  private final val DICTIONARY_DIALOG = 54
 
   private class WordDescription {
     var id: String = _
