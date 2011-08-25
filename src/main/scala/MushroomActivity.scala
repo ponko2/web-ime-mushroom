@@ -82,6 +82,8 @@ class MushroomActivity extends ListActivity {
       case R.id.menu_item_delete =>
         onRemoveAllWord()
         true
+      case R.id.menu_item_dictionary =>
+        true
       case _ =>
         super.onMenuItemSelected(featureId, item)
     }

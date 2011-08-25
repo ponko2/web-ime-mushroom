@@ -7,6 +7,7 @@
    <string name="context_menu_search_word">Search</string>
    <string name="menu_item_settings_label">Settings</string>
    <string name="menu_item_delete_label">Delete Cache</string>
+   <string name="menu_item_dictionary_label">Add Dictionary</string>
    <string name="input_dialog_title">Input Dialog</string>
    <string name="toast_copy_word">Clipboardへコピーしました</string>
    <string name="toast_remove_cache">Cacheの削除を行いました</string>

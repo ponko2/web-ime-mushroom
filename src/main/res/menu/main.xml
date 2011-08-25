@@ -6,4 +6,7 @@
     <item android:id="@+id/menu_item_delete"
         android:icon="@android:drawable/ic_menu_delete"
         android:title="@string/menu_item_delete_label"/>
+    <item android:id="@+id/menu_item_dictionary"
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="@string/menu_item_dictionary_label"/>
 </menu>
