@@ -83,6 +83,7 @@ class MushroomActivity extends ListActivity {
         onRemoveAllWord()
         true
       case R.id.menu_item_dictionary =>
+        showDialog(DICTIONARY_DIALOG)
         true
       case _ =>
         super.onMenuItemSelected(featureId, item)
@@ -154,26 +155,48 @@ class MushroomActivity extends ListActivity {
 
   override protected def onCreateDialog(id: Int): Dialog = {
     id match {
-      case INPUT_DIALOG => {
-        val inflater = LayoutInflater.from(this)
-        val view     = inflater.inflate(R.layout.input_dialog, null)
-        val editText = view.findViewById(R.id.input_text).asInstanceOf[EditText]
-        editText.setText(mClipboard.getText)
-        new AlertDialog.Builder(MushroomActivity.this)
-           .setIcon(android.R.drawable.ic_dialog_info)
-           .setTitle(R.string.input_dialog_title)
-           .setView(view)
-           .setPositiveButton("OK", new DialogInterface.OnClickListener() {
-              def onClick(dialog: DialogInterface, which: Int) {
-                mInputWord = editText.getText.toString
-                mAdapter.changeCursor(initializeCursor(mInputWord))
-                onTransliterate(mInputWord)
-              }
-           })
-           .create()
-      }
-      case _ => null
+      case INPUT_DIALOG      => createInputDialog()
+      case DICTIONARY_DIALOG => createDictionaryDialog()
+      case _                 => null
     }
+  }
+
+  private def createInputDialog(): Dialog = {
+    val inflater = LayoutInflater.from(this)
+    val view     = inflater.inflate(R.layout.input_dialog, null)
+    val editText = view.findViewById(R.id.input_text).asInstanceOf[EditText]
+    editText.setText(mClipboard.getText)
+    new AlertDialog.Builder(MushroomActivity.this)
+       .setIcon(android.R.drawable.ic_dialog_info)
+       .setTitle(R.string.input_dialog_title)
+       .setView(view)
+       .setPositiveButton(R.string.positive_button, new DialogInterface.OnClickListener() {
+          def onClick(dialog: DialogInterface, which: Int) {
+            mInputWord = editText.getText.toString
+            mAdapter.changeCursor(initializeCursor(mInputWord))
+            onTransliterate(mInputWord)
+          }
+       })
+       .create()
+  }
+
+  private def createDictionaryDialog(): Dialog = {
+    val inflater = LayoutInflater.from(this)
+    val view = inflater.inflate(R.layout.dictionary_dialog, null)
+    val yomi = view.findViewById(R.id.dictionary_yomi).asInstanceOf[EditText]
+    val word = view.findViewById(R.id.dictionary_word).asInstanceOf[EditText]
+    yomi.setText(if (mInputWord.nonEmpty) mInputWord else mReplaceWord)
+    new AlertDialog.Builder(MushroomActivity.this)
+       .setIcon(android.R.drawable.ic_dialog_info)
+       .setTitle(R.string.dictionary_dialog_title)
+       .setView(view)
+       .setPositiveButton(R.string.positive_button, new DialogInterface.OnClickListener() {
+          def onClick(dialog: DialogInterface, which: Int) { }
+       })
+       .setNegativeButton(R.string.negative_button, new DialogInterface.OnClickListener() {
+          def onClick(dialog: DialogInterface, which: Int) { }
+       })
+       .create()
   }
 
   private def onTransliterate(word: String) {
@@ -322,12 +345,13 @@ class MushroomActivity extends ListActivity {
 }
 
 object MushroomActivity {
-  private final val ACTION_INTERCEPT = "com.adamrocker.android.simeji.ACTION_INTERCEPT"
-  private final val REPLACE_KEY      = "replace_key"
-  private final val MENU_ID_COPY     = 1
-  private final val MENU_ID_DELETE   = 2
-  private final val MENU_ID_SEARCH   = 3
-  private final val INPUT_DIALOG     = 42
+  private final val ACTION_INTERCEPT  = "com.adamrocker.android.simeji.ACTION_INTERCEPT"
+  private final val REPLACE_KEY       = "replace_key"
+  private final val MENU_ID_COPY      = 1
+  private final val MENU_ID_DELETE    = 2
+  private final val MENU_ID_SEARCH    = 3
+  private final val INPUT_DIALOG      = 42
+  private final val DICTIONARY_DIALOG = 54
 
   private class WordDescription {
     var id: String = _
