@@ -2,9 +2,10 @@
    <string name="app_name">Web IME Mushroom</string>
    <string name="activity_preferences">Settings</string>
    <string name="list_empty">No data</string>
-   <string name="dictionary_yomi">読み</string>
+   <string name="dictionary_yomi">よみ</string>
    <string name="dictionary_word">単語</string>
    <string name="dictionary_hint">20文字未満</string>
+   <string name="dictionary_note">一度登録した単語は削除できません</string>
    <string name="context_menu_copy_word">Copy</string>
    <string name="context_menu_delete_word">Delete</string>
    <string name="context_menu_search_word">Search</string>
@@ -12,7 +13,7 @@
    <string name="menu_item_delete_label">Delete Cache</string>
    <string name="menu_item_dictionary_label">Add Dictionary</string>
    <string name="input_dialog_title">Input Dialog</string>
-   <string name="dictionary_dialog_title">Social IME 辞書登録</string>
+   <string name="dictionary_dialog_title">Social IME 単語登録</string>
    <string name="toast_copy_word">Clipboardへコピーしました</string>
    <string name="toast_remove_cache">Cacheの削除を行いました</string>
    <string name="api_preferences">API設定</string>
@@ -24,6 +25,10 @@
    <string name="summary_social_ime_preference">Social IME かな漢字変換APIを使用します</string>
    <string name="title_social_ime_predict_preference">Social IME Predict</string>
    <string name="summary_social_ime_predict_preference">Social IME 予測変換APIを使用します</string>
+   <string name="progress_add_dictionary_task">単語登録を実行しています</string>
+   <string name="complete_add_dictionary_task">単語登録が完了しました</string>
+   <string name="failure_add_dictionary_task">単語登録がサーバーに拒否されました</string>
+   <string name="failure_length_add_dictionary_task">文字列の長さが不正です</string>
    <string name="positive_button">OK</string>
    <string name="negative_button">Cancel</string>
 </resources>
