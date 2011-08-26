@@ -2,10 +2,6 @@
 ## 説明
 Simeji/ATOK等のマッシュルーム対応アプリから呼び出し、Social IME かな漢字変換API/Social IME 予測変換API/Google CGI API for Japanese Input/Google Suggest APIで変換を行うプラグインです。
 
-## アプリのスクリーンショット
-[サンプル画像1](https://github.com/downloads/ponko2/web-ime-mushroom/sample1.png)
-[サンプル画像2](https://github.com/downloads/ponko2/web-ime-mushroom/sample2.png)
-
 ## 機能
 * 一度変換した文字のキャッシュ
 * 変換に使用した文字の最前列表示
@@ -13,6 +9,7 @@ Simeji/ATOK等のマッシュルーム対応アプリから呼び出し、Social
 * マッシュルーム以外からの起動(Clipboardへコピーされます)
 * 変換候補からのWeb検索
 * 変換に使用するAPIの設定
+* Social IMEへの単語登録
 
 ## インストール
 [Android Market](https://market.android.com/details?id=jp.ponko2.android.webime)
