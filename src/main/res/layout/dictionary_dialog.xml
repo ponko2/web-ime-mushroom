@@ -5,7 +5,7 @@
    android:layout_height="wrap_content"
    android:paddingLeft="10dip"
    android:paddingRight="10dip"
-   android:shrinkColumns="0"
+   android:shrinkColumns="1"
    android:stretchColumns="1">
    <TableRow
       android:layout_width="fill_parent"
