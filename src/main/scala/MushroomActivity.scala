@@ -16,13 +16,14 @@ import dispatch.Http
 import dispatch.Threads
 import dispatch.StatusCode
 
+import jp.ponko2.android.os.AsyncTask1
+
 class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
   private var mInputWord = ""
   private var mApiSettings: Seq[WebIME] = Seq()
-  private var mTasks: Seq[AsyncTask[String, Nothing, Either[Throwable, Int]]] = Seq()
-  private var mAddDictionaryTask: AsyncTask[(String, String), Nothing, Either[Throwable, String]] = _
+  private var mTasks: Seq[AsyncTask[String, Int, Either[Throwable, Int]]] = Seq()
 
   private lazy val mReplaceWord = getReplaceWord()
   private lazy val mPreferences = getSharedPreferences(Preferences.NAME, Context.MODE_PRIVATE)
@@ -31,6 +32,7 @@ class MushroomActivity extends ListActivity {
   private lazy val mProgress = new ProgressDialog(this)
   private lazy val mDatabase = new WordDatabase(this).getWritableDatabase
   private lazy val mAdapter  = new WordsAdapter(this, initializeCursor(mReplaceWord))
+  private lazy val mAddDictionaryTask = new AddDictionaryTask
 
   override protected def onCreate(savedInstanceState: Bundle) {
     super.onCreate(savedInstanceState)
@@ -127,11 +129,9 @@ class MushroomActivity extends ListActivity {
   override protected def onDestroy() {
     super.onDestroy()
 
-    def cancel(asyncTask: AsyncTask[_, _, _]) {
-      Option(asyncTask) match {
-        case Some(task) if task.getStatus == AsyncTask.Status.RUNNING =>
-          task cancel true
-        case _ =>
+    def cancel(task: AsyncTask[_, _, _]) {
+      if (task.getStatus == AsyncTask.Status.RUNNING) {
+        task cancel true
       }
     }
 
@@ -198,9 +198,7 @@ class MushroomActivity extends ListActivity {
        .setView(view)
        .setPositiveButton(R.string.positive_button, new DialogInterface.OnClickListener() {
           def onClick(dialog: DialogInterface, which: Int) {
-            mAddDictionaryTask = new AddDictionaryTask().execute(
-              (yomi.getText.toString, word.getText.toString)
-            )
+            mAddDictionaryTask.execute((yomi.getText.toString, word.getText.toString))
           }
        })
        .setNegativeButton(R.string.negative_button, new DialogInterface.OnClickListener() {
@@ -254,6 +252,16 @@ class MushroomActivity extends ListActivity {
     requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS)
   }
 
+  private def showProgress() = {
+    setProgressBarVisibility(true)
+    setProgressBarIndeterminateVisibility(true)
+  }
+
+  private def hideProgress() = {
+    setProgressBarVisibility(false)
+    setProgressBarIndeterminateVisibility(false)
+  }
+
   private def initializeCursor(word: String): Cursor = {
     val selection = if (mApiSettings.nonEmpty && word.nonEmpty) {
       WordDatabase.COLUMN_INPUT + "=? and " +
@@ -272,15 +280,29 @@ class MushroomActivity extends ListActivity {
     cursor
   }
 
-  private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Nothing, Either[Throwable, Int]] {
+  private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Int, Either[Throwable, Int]] {
     override protected def onPreExecute() = showProgress()
 
     override protected def doInBackground(param: String): Either[Throwable, Int] = {
-      allCatch either WordDatabase.addWords(mDatabase, webIME.tag, param, mHttp(webIME.transliterate(param)))
+      try {
+        allCatch either WordDatabase.addWords(mDatabase, webIME.tag, param, mHttp(webIME.transliterate(param)))
+      } finally {
+        publishProgress(mTasks.count(task => task.getStatus == AsyncTask.Status.FINISHED) + 1)
+      }
+    }
+
+    override protected def onProgressUpdate(progress: Int) {
+      val task = mTasks.size
+      if (progress > 0 && task > 0) {
+        setProgress(((progress / task.toFloat) * 10000).toInt)
+      }
     }
 
     override protected def onPostExecute(result: Either[Throwable, Int]) {
-      hideProgress()
+      if (mTasks.count(task => task.getStatus == AsyncTask.Status.RUNNING) <= 1) {
+        hideProgress()
+      }
+
       result match {
         case Right(count) => if (count > 0) mAdapter.refresh()
         case Left(error) => {
@@ -290,27 +312,6 @@ class MushroomActivity extends ListActivity {
           })
           Toast.makeText(MushroomActivity.this, message, Toast.LENGTH_LONG).show()
         }
-      }
-    }
-
-    private def showProgress() = {
-      setProgressBarVisibility(true)
-      setProgressBarIndeterminateVisibility(true)
-    }
-
-    private def hideProgress() = {
-      val task_count = mTasks.size.toDouble
-      val running_task_count = mTasks.count(task => task.getStatus == AsyncTask.Status.RUNNING)
-
-      try {
-        setProgress((10000 * (1 - (running_task_count - 1) / task_count)).toInt)
-      } catch {
-        case e => setProgress(10000)
-      }
-
-      if (running_task_count <= 1) {
-        setProgressBarVisibility(false)
-        setProgressBarIndeterminateVisibility(false)
       }
     }
   }
