@@ -252,14 +252,17 @@ class MushroomActivity extends ListActivity {
     requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS)
   }
 
-  private def showProgress() = {
-    setProgressBarVisibility(true)
-    setProgressBarIndeterminateVisibility(true)
+  private def showProgress() {
+    setProgressBarsVisibility(true)
   }
 
-  private def hideProgress() = {
-    setProgressBarVisibility(false)
-    setProgressBarIndeterminateVisibility(false)
+  private def hideProgress() {
+    setProgressBarsVisibility(false)
+  }
+
+  private def setProgressBarsVisibility(flag: Boolean) {
+    setProgressBarVisibility(flag)
+    setProgressBarIndeterminateVisibility(flag)
   }
 
   private def initializeCursor(word: String): Cursor = {
@@ -282,6 +285,7 @@ class MushroomActivity extends ListActivity {
 
   private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Int, Either[Throwable, Int]] {
     override protected def onPreExecute() = showProgress()
+    override protected def onCancelled()  = hideProgress()
 
     override protected def doInBackground(param: String): Either[Throwable, Int] = {
       try {
@@ -323,6 +327,8 @@ class MushroomActivity extends ListActivity {
       mProgress.setCancelable(true)
       mProgress.show()
     }
+
+    override protected def onCancelled() = mProgress.dismiss()
 
     override protected def doInBackground(param: (String, String)): Either[Throwable, String] = {
       val (yomi, word) = param
