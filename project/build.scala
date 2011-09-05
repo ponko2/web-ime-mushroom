@@ -7,7 +7,7 @@ object General {
   val settings = Defaults.defaultSettings ++ Seq (
     name := "Web IME Mushroom",
     version := "0.4.0",
-    scalaVersion := "2.9.0-1",
+    scalaVersion := "2.9.1",
     platformName in Android := "android-7"
   )
 
