@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen
    xmlns:android="http://schemas.android.com/apk/res/android">
+   <PreferenceCategory android:title="@string/ime_preferences">
+      <CheckBoxPreference
+         android:key="webime.input_equal_result"
+         android:defaultValue="true"
+         android:title="@string/title_input_equal_result_preference"
+         android:summary="@string/summary_input_equal_result_preference"/>
+   </PreferenceCategory>
    <PreferenceCategory android:title="@string/api_preferences">
       <CheckBoxPreference
          android:key="webime.google_japanese_input"

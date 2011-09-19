@@ -7,6 +7,7 @@ object Preferences {
   final val KEY_GOOGLE_SUGGEST        = "webime.google_suggest"
   final val KEY_SOCIAL_IME            = "webime.social_ime"
   final val KEY_SOCIAL_IME_PREDICT    = "webime.social_ime_predict"
+  final val KEY_INPUT_EQUAL_RESULT    = "webime.input_equal_result"
 
   def apiSettings(): Map[String, WebIME] = {
     Map(KEY_GOOGLE_JAPANESE_INPUT -> GoogleJapaneseInput

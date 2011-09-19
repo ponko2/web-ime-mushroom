@@ -22,7 +22,6 @@ class MushroomActivity extends ListActivity {
   import MushroomActivity._
 
   private var mInputWord = ""
-  private var mApiSettings: Seq[WebIME] = Seq()
   private var mTasks: Seq[AsyncTask[String, Int, Either[Throwable, Int]]] = Seq()
 
   private lazy val mReplaceWord = getReplaceWord()
@@ -39,18 +38,15 @@ class MushroomActivity extends ListActivity {
 
     setupProgress()
     setContentView(R.layout.main)
-    mApiSettings = getApiSettings()
     setupViews()
 
     onTransliterate(mReplaceWord)
   }
 
-  override protected def onRestart() {
-    super.onRestart()
+  override protected def onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
+    super.onActivityResult(requestCode, resultCode, data)
 
-    val apiSettings = getApiSettings()
-    if (mApiSettings != apiSettings) {
-      mApiSettings = apiSettings
+    if (requestCode == SettingsActivity.REQUEST_CODE) {
       val word = if (mInputWord.nonEmpty) mInputWord else mReplaceWord
       mAdapter.changeCursor(initializeCursor(word))
       onTransliterate(word)
@@ -65,7 +61,7 @@ class MushroomActivity extends ListActivity {
     }
   }
 
-  private def getApiSettings(): Seq[WebIME] = {
+  private def apiSettings(): Seq[WebIME] = {
     Preferences.apiSettings.filterKeys(key => mPreferences.getBoolean(key, true)).values.toSeq
   }
 
@@ -210,7 +206,7 @@ class MushroomActivity extends ListActivity {
 
   private def onTransliterate(word: String) {
     if (word.nonEmpty) {
-      mTasks = mApiSettings.map(api => new TransliterateTask(api).execute(word))
+      mTasks = apiSettings.map(api => new TransliterateTask(api).execute(word))
     } else {
       showDialog(INPUT_DIALOG)
     }
@@ -267,12 +263,18 @@ class MushroomActivity extends ListActivity {
   }
 
   private def initializeCursor(word: String): Cursor = {
-    val selection = if (mApiSettings.nonEmpty && word.nonEmpty) {
+    val api = apiSettings()
+    val selection = if (api.nonEmpty && word.nonEmpty) {
       WordDatabase.COLUMN_INPUT + "=? and " +
-        mApiSettings.map(api => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")")
+        api.map(_ => WordDatabase.COLUMN_API + "=?").mkString("("," or ",")") +
+        (if (mPreferences.getBoolean(Preferences.KEY_INPUT_EQUAL_RESULT, true)) {
+          "and not (" +
+          WordDatabase.COLUMN_INPUT + " = " + WordDatabase.COLUMN_RESULT + " and " +
+          WordDatabase.COLUMN_SEPARATOR + " != 0)"
+        } else { "" })
     } else { "0 = 1" }
-    val selectionArgs = if (mApiSettings.nonEmpty && word.nonEmpty) {
-      Array(word) ++ mApiSettings.map(api => api.tag)
+    val selectionArgs = if (api.nonEmpty && word.nonEmpty) {
+      Array(word) ++ api.map(_.tag)
     } else { null }
 
     mDatabase.query(
