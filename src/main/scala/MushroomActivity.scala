@@ -138,6 +138,7 @@ class MushroomActivity extends ListActivity {
     mTasks.foreach(cancel)
     cancel(mAddDictionaryTask)
 
+    mAdapter.close()
     mDatabase.close()
     mHttp.shutdown()
   }
@@ -274,13 +275,10 @@ class MushroomActivity extends ListActivity {
       Array(word) ++ mApiSettings.map(api => api.tag)
     } else { null }
 
-    val cursor = mDatabase.query(
+    mDatabase.query(
       WordDatabase.TABLE_WORDS,
       Array(WordDatabase._ID, WordDatabase.COLUMN_API, WordDatabase.COLUMN_RESULT, WordDatabase.COLUMN_SEPARATOR),
       selection, selectionArgs, null, null, WordDatabase.SORT_DEFAULT)
-
-    startManagingCursor(cursor)
-    cursor
   }
 
   private class TransliterateTask(webIME: WebIME) extends AsyncTask1[String, Int, Either[Throwable, Int]] {
@@ -396,7 +394,7 @@ class MushroomActivity extends ListActivity {
     override def getViewTypeCount(): Int = TYPE_COUNT
 
     override def getItemViewType(position: Int): Int = {
-      val cursor = this.getCursor()
+      val cursor = getCursor()
       cursor.moveToPosition(position)
 
       if (cursor.getInt(mSeparator) == TYPE_SEPARATOR) TYPE_SEPARATOR else TYPE_ITEM
@@ -404,6 +402,15 @@ class MushroomActivity extends ListActivity {
 
     override def isEnabled(position: Int): Boolean = {
       getItemViewType(position) == TYPE_ITEM
+    }
+
+    override def changeCursor(cursor: Cursor) {
+      getCursor.close()
+      super.changeCursor(cursor)
+    }
+
+    def close() {
+      getCursor.close()
     }
 
     def refresh() {
