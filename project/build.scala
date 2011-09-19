@@ -6,7 +6,7 @@ import AndroidKeys._
 object General {
   val settings = Defaults.defaultSettings ++ Seq (
     name := "Web IME Mushroom",
-    version := "0.4.0",
+    version := "0.5.0",
     scalaVersion := "2.9.1",
     platformName in Android := "android-7"
   )
