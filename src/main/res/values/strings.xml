@@ -17,7 +17,7 @@
    <string name="toast_copy_word">Clipboardへコピーしました</string>
    <string name="toast_remove_cache">Cacheの削除を行いました</string>
    <string name="ime_preferences">変換設定</string>
-   <string name="title_input_equal_result_preference">入力文字列の表示</string>
+   <string name="title_input_equal_result_preference">入力文字列を非表示</string>
    <string name="summary_input_equal_result_preference">入力した文字列と完全一致する候補を非表示にする</string>
    <string name="api_preferences">API設定</string>
    <string name="title_google_japanese_input_preference">Google Japanese Input</string>
