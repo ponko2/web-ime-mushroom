@@ -31,7 +31,7 @@ object SocialIME extends WebIME {
     require(Option(text).getOrElse("").nonEmpty)
 
     api <<? Map("charset" -> "UTF-8", "string" -> text, "resize[0]" -> "+99999") >- {
-      tsv => tsv.stripLineEnd.split("[\t\n\r]+")
+      tsv => tsv.stripLineEnd.split("[\t\n\r]+").filter(_.nonEmpty)
     }
   }
 }
@@ -44,7 +44,7 @@ object SocialImePredict extends WebIME {
     require(Option(text).getOrElse("").nonEmpty)
 
     api <<? Map("charset" -> "UTF-8", "string" -> text) >- {
-      tsv => tsv.stripLineEnd.split("[\t\n\r]+")
+      tsv => tsv.stripLineEnd.split("[\t\n\r]+").filter(_.nonEmpty)
     }
   }
 }
