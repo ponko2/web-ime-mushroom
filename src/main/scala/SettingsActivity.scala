@@ -1,8 +1,9 @@
 package jp.ponko2.android.webime
 
 import _root_.android.os.Bundle
+import _root_.android.app.Activity
 import _root_.android.preference.PreferenceActivity
-import _root_.android.content.{Context, Intent}
+import _root_.android.content.Intent
 
 class SettingsActivity extends PreferenceActivity {
   override protected def onCreate(savedInstanceState: Bundle) {
@@ -14,8 +15,10 @@ class SettingsActivity extends PreferenceActivity {
 }
 
 object SettingsActivity {
-  def show(context: Context) {
-    val intent = new Intent(context, classOf[SettingsActivity])
-    context.startActivity(intent)
+  val REQUEST_CODE = 42
+
+  def show(activity: Activity) {
+    val intent = new Intent(activity, classOf[SettingsActivity])
+    activity.startActivityForResult(intent, REQUEST_CODE)
   }
 }
